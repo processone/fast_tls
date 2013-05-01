@@ -32,7 +32,7 @@
 
 -behaviour(gen_server).
 
--export([start/0, start_link/0, tcp_to_tls/2,
+-export([start_link/0, tcp_to_tls/2,
 	 tls_to_tcp/1, send/2, recv/2, recv/3, recv_data/2,
 	 setopts/2, sockname/1, peername/1,
 	 controlling_process/2, close/1, get_peer_certificate/1,
@@ -71,9 +71,6 @@
 
 -export_type([tls_socket/0]).
 
-start() ->
-    gen_server:start({local, ?MODULE}, ?MODULE, [], []).
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [],
 			  []).
@@ -81,13 +78,7 @@ start_link() ->
 init([]) ->
     case load_driver() of
         ok ->
-            Port = open_port({spawn, "tls_drv"}, [binary]),
-            Res = port_control(Port, ?SET_CERTIFICATE_FILE_ACCEPT,
-                               <<"./ssl.pem", 0>>),
-            case Res of
-                <<0>> -> {ok, Port};
-                <<1, Error/binary>> -> {stop, Error}
-            end;
+            {ok, []};
         {error, Why} ->
             {stop, Why}
     end.
@@ -108,7 +99,8 @@ handle_info(_, State) -> {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
-terminate(_Reason, Port) -> Port ! {self, close}, ok.
+terminate(_Reason, _State) ->
+    ok.
 
 -spec tcp_to_tls(inet:socket(),
                  [{atom(), any()}]) -> {'error','no_certfile' | binary()} |
@@ -117,10 +109,7 @@ terminate(_Reason, Port) -> Port ! {self, close}, ok.
 tcp_to_tls(TCPSocket, Options) ->
     case lists:keysearch(certfile, 1, Options) of
       {value, {certfile, CertFile}} ->
-	  case erl_ddll:load_driver(get_so_path(), tls_drv) of
-	    ok -> ok;
-	    {error, already_loaded} -> ok
-	  end,
+	  load_driver(),
 	  Port = open_port({spawn, "tls_drv"}, [binary]),
 	  Flags = case lists:member(verify_none, Options) of
 		    true -> ?VERIFY_NONE;
@@ -267,10 +256,7 @@ get_verify_result(#tlssock{tlsport = Port}) ->
     Res.
 
 test() ->
-    case erl_ddll:load_driver(get_so_path(), tls_drv) of
-      ok -> ok;
-      {error, already_loaded} -> ok
-    end,
+    load_driver(),
     Port = open_port({spawn, "tls_drv"}, [binary]),
     ?PRINT("open_port: ~p~n", [Port]),
     PCRes = port_control(Port, ?SET_CERTIFICATE_FILE_ACCEPT,

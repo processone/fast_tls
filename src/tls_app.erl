@@ -34,6 +34,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
+    application:start(crypto),
     case tls_sup:start_link() of
         {ok, Pid} ->
             {ok, Pid};

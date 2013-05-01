@@ -28,8 +28,14 @@
 
 -author('alexey@process-one.net').
 
--export([start/0, sha/1, sha1/1, sha224/1, sha256/1,
+-behaviour(gen_server).
+
+-export([sha/1, sha1/1, sha224/1, sha256/1,
 	 sha384/1, sha512/1, to_hexlist/1]).
+
+%% Internal exports, call-back functions.
+-export([start_link/0, init/1, handle_call/3, handle_cast/2,
+	 handle_info/2, code_change/3, terminate/2]).
 
 -ifdef(HAVE_MD2).
 
@@ -39,16 +45,40 @@
 
 -define(DRIVER, sha_drv).
 
-start() ->
-    crypto:start(),
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [],
+			  []).
+
+init([]) ->
     case load_driver() of
         ok ->
             Port = open_port({spawn, atom_to_list(?DRIVER)},
                              [binary]),
-            register(?DRIVER, Port);
-        Err ->
-            Err
+            register(?DRIVER, Port),
+            {ok, Port};
+        {error, Why} ->
+            {stop, Why}
     end.
+
+%%% --------------------------------------------------------
+%%% The call-back functions.
+%%% --------------------------------------------------------
+
+handle_call(_, _, State) -> {noreply, State}.
+
+handle_cast(_, State) -> {noreply, State}.
+
+handle_info({'EXIT', Port, Reason}, Port) ->
+    {stop, {port_died, Reason}, Port};
+handle_info({'EXIT', _Pid, _Reason}, Port) ->
+    {noreply, Port};
+handle_info(_, State) -> {noreply, State}.
+
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
+
+terminate(_Reason, Port) ->
+    catch port_close(Port),
+    ok.
 
 digit_to_xchar(D) when (D >= 0) and (D < 10) -> D + 48;
 digit_to_xchar(D) -> D + 87.
