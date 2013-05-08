@@ -3933,18 +3933,23 @@ if test "x$ac_cv_lib_crypto_SHA1_Init" = x""yes; then :
   CRYPTO_LIB=yes
 fi
 
-for ac_header in openssl/ssl.h openssl/err.h openssl/sha.h
-do :
-  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
-if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
-
+ac_fn_c_check_header_mongrel "$LINENO" "openssl/ssl.h" "ac_cv_header_openssl_ssl_h" "$ac_includes_default"
+if test "x$ac_cv_header_openssl_ssl_h" = x""yes; then :
+  SSL_HEADER=yes
 fi
 
-done
+
+ac_fn_c_check_header_mongrel "$LINENO" "openssl/err.h" "ac_cv_header_openssl_err_h" "$ac_includes_default"
+if test "x$ac_cv_header_openssl_err_h" = x""yes; then :
+  ERR_HEADER=yes
+fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "openssl/sha.h" "ac_cv_header_openssl_sha_h" "$ac_includes_default"
+if test "x$ac_cv_header_openssl_sha_h" = x""yes; then :
+  SHA_HEADER=yes
+fi
+
 
 
 if test "x$SSL_LIB" = "x"; then
@@ -3955,15 +3960,15 @@ if test "x$CRYPTO_LIB" = "x"; then
    as_fn_error $? "OpenSSL 'crypto' library was not found" "$LINENO" 5
 fi
 
-if test "x$HAVE_OPENSSL/SSL.H" = "x"; then
+if test "x$SSL_HEADER" = "x"; then
    as_fn_error $? "OpenSSL header file \"openssl/ssl.h\" was not found" "$LINENO" 5
 fi
 
-if test "x$HAVE_OPENSSL/ERR.H" = "x"; then
+if test "x$ERR_HEADER" = "x"; then
    as_fn_error $? "OpenSSL header file \"openssl/err.h\" was not found" "$LINENO" 5
 fi
 
-if test "x$HAVE_OPENSSL/SHA.H" = "x"; then
+if test "x$SHA_HEADER" = "x"; then
    as_fn_error $? "OpenSSL header file \"openssl/sha.h\" was not found" "$LINENO" 5
 fi
 

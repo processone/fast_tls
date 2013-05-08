@@ -30,7 +30,9 @@ AC_ERLANG_SUBST_LIB_DIR
 
 AC_CHECK_LIB(ssl, SSL_free, [SSL_LIB=yes], [], [])
 AC_CHECK_LIB(crypto, SHA1_Init, [CRYPTO_LIB=yes], [], [])
-AC_CHECK_HEADERS([openssl/ssl.h openssl/err.h openssl/sha.h], [], [], [])
+AC_CHECK_HEADER(openssl/ssl.h, [SSL_HEADER=yes], [], [])
+AC_CHECK_HEADER(openssl/err.h, [ERR_HEADER=yes], [], [])
+AC_CHECK_HEADER(openssl/sha.h, [SHA_HEADER=yes], [], [])
 
 if test "x$SSL_LIB" = "x"; then
    AC_MSG_ERROR([OpenSSL 'ssl' library was not found])
@@ -40,15 +42,15 @@ if test "x$CRYPTO_LIB" = "x"; then
    AC_MSG_ERROR([OpenSSL 'crypto' library was not found])
 fi
 
-if test "x$HAVE_OPENSSL/SSL.H" = "x"; then
+if test "x$SSL_HEADER" = "x"; then
    AC_MSG_ERROR([OpenSSL header file "openssl/ssl.h" was not found])
 fi
 
-if test "x$HAVE_OPENSSL/ERR.H" = "x"; then
+if test "x$ERR_HEADER" = "x"; then
    AC_MSG_ERROR([OpenSSL header file "openssl/err.h" was not found])
 fi
 
-if test "x$HAVE_OPENSSL/SHA.H" = "x"; then
+if test "x$SHA_HEADER" = "x"; then
    AC_MSG_ERROR([OpenSSL header file "openssl/sha.h" was not found])
 fi
 
