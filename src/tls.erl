@@ -373,7 +373,7 @@ integer_to_binary(I) ->
 get_so_path() ->
     case os:getenv("EJABBERD_SO_PATH") of
         false ->
-            case code:priv_dir(tls) of
+            case code:priv_dir(p1_tls) of
                 {error, _} ->
                     filename:join(["priv", "lib"]);
                 Path ->
