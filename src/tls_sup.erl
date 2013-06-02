@@ -52,9 +52,7 @@ start_link() ->
 init([]) ->
     TLS = {tls, {tls, start_link, []},
            permanent, brutal_kill, worker, [tls]},
-    SHA = {sha, {sha, start_link, []},
-           permanent, brutal_kill, worker, [sha]},
-    {ok, {{one_for_one, 10, 1}, [TLS, SHA]}}.
+    {ok, {{one_for_one, 10, 1}, [TLS]}}.
 
 %%%===================================================================
 %%% Internal functions

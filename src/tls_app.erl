@@ -34,10 +34,24 @@
 %% @end
 %%--------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
-    application:start(crypto),
-    case tls_sup:start_link() of
-        {ok, Pid} ->
-            {ok, Pid};
+    Res = case application:start(crypto) of
+              ok -> ok;
+              {error, {already_started, _}} -> ok;
+              Err -> Err
+          end,
+    case Res of
+        ok ->
+            case sha:load_nif() of
+                ok ->
+                    case tls_sup:start_link() of
+                        {ok, Pid} ->
+                            {ok, Pid};
+                        Error ->
+                            Error
+                    end;
+                Error ->
+                    Error
+            end;
         Error ->
             Error
     end.

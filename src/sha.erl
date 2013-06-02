@@ -28,102 +28,62 @@
 
 -author('alexey@process-one.net').
 
--behaviour(gen_server).
+-export([load_nif/0, load_nif/1,
+         sha/1, sha1/1, sha224/1, sha256/1,
+         sha384/1, sha512/1, to_hexlist/1]).
 
--export([sha/1, sha1/1, sha224/1, sha256/1,
-	 sha384/1, sha512/1, to_hexlist/1]).
-
-%% Internal exports, call-back functions.
--export([start_link/0, init/1, handle_call/3, handle_cast/2,
-	 handle_info/2, code_change/3, terminate/2]).
-
--ifdef(HAVE_MD2).
-
--export([md2/1]).
-
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 -endif.
 
--define(DRIVER, sha_drv).
+%%%===================================================================
+%%% API functions
+%%%===================================================================
+load_nif() ->
+    load_nif(get_so_path()).
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [],
-			  []).
-
-init([]) ->
-    case load_driver() of
+load_nif(LibDir) ->
+    SOPath = filename:join(LibDir, "sha"),
+    case catch erlang:load_nif(SOPath, 0) of
         ok ->
-            Port = open_port({spawn, atom_to_list(?DRIVER)},
-                             [binary]),
-            register(?DRIVER, Port),
-            {ok, Port};
-        {error, Why} ->
-            {stop, Why}
+            ok;
+        Err ->
+            error_logger:warning_msg("unable to load sha NIF: ~p~n", [Err]),
+            Err
     end.
 
-%%% --------------------------------------------------------
-%%% The call-back functions.
-%%% --------------------------------------------------------
+-spec to_hexlist(iodata()) -> binary().
+-spec sha(iodata()) -> binary().
+-spec sha1(iodata()) -> binary().
+-spec sha224(iodata()) -> binary().
+-spec sha256(iodata()) -> binary().
+-spec sha384(iodata()) -> binary().
+-spec sha512(iodata()) -> binary().
 
-handle_call(_, _, State) -> {noreply, State}.
-
-handle_cast(_, State) -> {noreply, State}.
-
-handle_info({'EXIT', Port, Reason}, Port) ->
-    {stop, {port_died, Reason}, Port};
-handle_info({'EXIT', _Pid, _Reason}, Port) ->
-    {noreply, Port};
-handle_info(_, State) -> {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) -> {ok, State}.
-
-terminate(_Reason, Port) ->
-    catch port_close(Port),
-    ok.
-
-digit_to_xchar(D) when (D >= 0) and (D < 10) -> D + 48;
-digit_to_xchar(D) -> D + 87.
-
--spec sha(binary()) -> binary().
+to_hexlist(_Text) ->
+    erlang:nif_error(nif_not_loaded).
 
 sha(Text) ->
-    Bin = crypto:sha(Text),
-    to_hexlist(Bin).
+    to_hexlist(sha1(Text)).
 
--spec to_hexlist(binary()) -> binary().
+sha1(_Text) ->
+    erlang:nif_error(nif_not_loaded).
 
-to_hexlist(Bin) ->
-    iolist_to_binary(lists:reverse(ints_to_rxstr(binary_to_list(Bin), []))).
+sha224(_Text) ->
+    erlang:nif_error(nif_not_loaded).
 
-ints_to_rxstr([], Res) -> Res;
-ints_to_rxstr([N | Ns], Res) ->
-    ints_to_rxstr(Ns,
-		  [digit_to_xchar(N rem 16), digit_to_xchar(N div 16)
-		   | Res]).
+sha256(_Text) ->
+    erlang:nif_error(nif_not_loaded).
 
--spec sha1(binary()) -> binary().
--spec sha224(binary()) -> binary().
--spec sha256(binary()) -> binary().
--spec sha384(binary()) -> binary().
--spec sha512(binary()) -> binary().
+sha384(_Text) ->
+    erlang:nif_error(nif_not_loaded).
 
-sha1(Text) -> crypto:sha(Text).
+sha512(_Text) ->
+    erlang:nif_error(nif_not_loaded).
 
-sha224(Text) -> erlang:port_control(?DRIVER, 224, Text).
-
-sha256(Text) -> erlang:port_control(?DRIVER, 256, Text).
-
-sha384(Text) -> erlang:port_control(?DRIVER, 384, Text).
-
-sha512(Text) -> erlang:port_control(?DRIVER, 512, Text).
-
--ifdef(HAVE_MD2).
-
--spec md2(binary()) -> binary().
-
-md2(Text) -> erlang:port_control(?DRIVER, 2, Text).
-
--endif.
-
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 get_so_path() ->
     case os:getenv("EJABBERD_SO_PATH") of
         false ->
@@ -137,14 +97,57 @@ get_so_path() ->
             Path
     end.
 
-load_driver() ->
-    case erl_ddll:load_driver(get_so_path(), ?DRIVER) of
-        ok ->
-            ok;
-        {error, already_loaded} ->
-            ok;
-        {error, ErrorDesc} = Err ->
-            error_logger:error_msg("failed to load SHA driver: ~s~n",
-                                   [erl_ddll:format_error(ErrorDesc)]),
-            Err
-    end.
+%%%===================================================================
+%%% Unit tests
+%%%===================================================================
+-ifdef(TEST).
+
+load_nif_test() ->
+    ?assertEqual(ok, load_nif(filename:join(["..", "priv", "lib"]))).
+
+sha1_test() ->
+    ?assertEqual(
+       <<169,74,143,229,204,177,155,166,28,76,8,115,211,145,233,
+         135,152,47,187,211>>,
+       sha1("test")).
+
+sha224_test() ->
+    ?assertEqual(
+       <<144,163,237,158,50,178,170,244,198,28,65,14,185,37,66,
+         97,25,225,169,220,83,212,40,106,222,153,168,9>>,
+       sha224("test")).
+
+sha256_test() ->
+    ?assertEqual(
+       <<159,134,208,129,136,76,125,101,154,47,234,160,197,90,208,
+         21,163,191,79,27,43,11,130,44,209,93,108,21,176,240,10,8>>,
+       sha256("test")).
+
+sha384_test() ->
+    ?assertEqual(
+       <<118,132,18,50,15,123,10,165,129,47,206,66,141,196,112,107,
+         60,174,80,224,42,100,202,161,106,120,34,73,191,232,239,196,
+         183,239,28,203,18,98,85,209,150,4,125,254,223,23,160,169>>,
+       sha384("test")).
+
+sha512_test() ->
+    ?assertEqual(
+       <<238,38,176,221,74,247,231,73,170,26,142,227,193,10,233,146,
+         63,97,137,128,119,46,71,63,136,25,165,212,148,14,13,178,122,
+         193,133,248,160,225,213,248,79,136,188,136,127,214,123,20,55,
+         50,195,4,204,95,169,173,142,111,87,245,0,40,168,255>>,
+       sha512("test")).
+
+to_hexlist_test() ->
+    ?assertEqual(
+       <<"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122"
+         "232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445"
+         "464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768"
+         "696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b"
+         "8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadae"
+         "afb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1"
+         "d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4"
+         "f5f6f7f8f9fafbfcfdfeff">>,
+       to_hexlist(lists:seq(0, 255))).
+
+-endif.

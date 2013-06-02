@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 {application, p1_tls,
  [{description,  "OpenSSL wrapper"},
-  {vsn,          "0.1.0"},
+  {vsn,          "0.2.0"},
   {modules,      []},
   {registered,   []},
   {applications, [kernel, stdlib]},
