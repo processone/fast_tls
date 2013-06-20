@@ -41,7 +41,7 @@ start(_StartType, _StartArgs) ->
           end,
     case Res of
         ok ->
-            case sha:load_nif() of
+            case p1_sha:load_nif() of
                 ok ->
                     case p1_tls_sup:start_link() of
                         {ok, Pid} ->
