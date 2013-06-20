@@ -1,11 +1,11 @@
 %%%----------------------------------------------------------------------
-%%% File    : tls.erl
+%%% File    : p1_tls.erl
 %%% Author  : Alexey Shchepin <alexey@process-one.net>
 %%% Purpose : Interface to openssl
 %%% Created : 24 Jul 2004 by Alexey Shchepin <alexey@process-one.net>
 %%%
 %%%
-%%% tls, Copyright (C) 2002-2013   ProcessOne
+%%% p1_tls, Copyright (C) 2002-2013   ProcessOne
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
@@ -24,7 +24,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(tls).
+-module(p1_tls).
 
 -author('alexey@process-one.net').
 
@@ -110,7 +110,7 @@ tcp_to_tls(TCPSocket, Options) ->
     case lists:keysearch(certfile, 1, Options) of
       {value, {certfile, CertFile}} ->
 	  load_driver(),
-	  Port = open_port({spawn, "tls_drv"}, [binary]),
+	  Port = open_port({spawn, "p1_tls_drv"}, [binary]),
 	  Flags = case lists:member(verify_none, Options) of
 		    true -> ?VERIFY_NONE;
 		    false -> 0
@@ -257,7 +257,7 @@ get_verify_result(#tlssock{tlsport = Port}) ->
 
 test() ->
     load_driver(),
-    Port = open_port({spawn, "tls_drv"}, [binary]),
+    Port = open_port({spawn, "p1_tls_drv"}, [binary]),
     ?PRINT("open_port: ~p~n", [Port]),
     PCRes = port_control(Port, ?SET_CERTIFICATE_FILE_ACCEPT,
 			 <<"./ssl.pem", 0>>),
@@ -384,7 +384,7 @@ get_so_path() ->
     end.
 
 load_driver() ->
-    case erl_ddll:load_driver(get_so_path(), tls_drv) of
+    case erl_ddll:load_driver(get_so_path(), p1_tls_drv) of
         ok ->
             ok;
         {error, already_loaded} ->

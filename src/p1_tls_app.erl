@@ -6,7 +6,7 @@
 %%% @end
 %%% Created :  4 Apr 2013 by Evgeniy Khramtsov <ekhramtsov@process-one.net>
 %%%-------------------------------------------------------------------
--module(tls_app).
+-module(p1_tls_app).
 
 -behaviour(application).
 
@@ -43,7 +43,7 @@ start(_StartType, _StartArgs) ->
         ok ->
             case sha:load_nif() of
                 ok ->
-                    case tls_sup:start_link() of
+                    case p1_tls_sup:start_link() of
                         {ok, Pid} ->
                             {ok, Pid};
                         Error ->

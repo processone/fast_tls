@@ -138,4 +138,4 @@ static ErlNifFunc nif_funcs[] =
 	{"to_hexlist", 1, to_hexlist}
     };
 
-ERL_NIF_INIT(sha, nif_funcs, load, NULL, NULL, NULL)
+ERL_NIF_INIT(p1_sha, nif_funcs, load, NULL, NULL, NULL)

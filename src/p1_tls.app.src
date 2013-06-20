@@ -12,7 +12,7 @@
   {modules,      []},
   {registered,   []},
   {applications, [kernel, stdlib]},
-  {mod,          {tls_app,[]}}]}.
+  {mod,          {p1_tls_app,[]}}]}.
 
 %% Local Variables:
 %% mode: erlang

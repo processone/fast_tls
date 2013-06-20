@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% File    : sha.erl
+%%% File    : p1_sha.erl
 %%% Author  : Alexey Shchepin <alexey@process-one.net>
 %%% Purpose :
 %%% Created : 20 Dec 2002 by Alexey Shchepin <alexey@process-one.net>
@@ -24,7 +24,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(sha).
+-module(p1_sha).
 
 -author('alexey@process-one.net').
 
@@ -43,7 +43,7 @@ load_nif() ->
     load_nif(get_so_path()).
 
 load_nif(LibDir) ->
-    SOPath = filename:join(LibDir, "sha"),
+    SOPath = filename:join(LibDir, "p1_sha"),
     case catch erlang:load_nif(SOPath, 0) of
         ok ->
             ok;

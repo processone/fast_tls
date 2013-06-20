@@ -6,7 +6,7 @@
 %%% @end
 %%% Created :  4 Apr 2013 by Evgeniy Khramtsov <ekhramtsov@process-one.net>
 %%%-------------------------------------------------------------------
--module(tls_sup).
+-module(p1_tls_sup).
 
 -behaviour(supervisor).
 
@@ -50,8 +50,8 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    TLS = {tls, {tls, start_link, []},
-           permanent, brutal_kill, worker, [tls]},
+    TLS = {p1_tls, {p1_tls, start_link, []},
+           permanent, brutal_kill, worker, [p1_tls]},
     {ok, {{one_for_one, 10, 1}, [TLS]}}.
 
 %%%===================================================================
