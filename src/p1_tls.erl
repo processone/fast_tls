@@ -158,6 +158,9 @@ recv(#tlssock{tcpsock = TCPSocket, tlsport = Port} =
       <<1, Error/binary>> -> {error, (Error)}
     end.
 
+-spec recv_data(tls_socket(), binary()) -> {error, inet:posix() | binary()} |
+                                           {ok, binary()}.
+
 recv_data(TLSSock, Packet) ->
     recv_data(TLSSock, Packet, 0).
 
