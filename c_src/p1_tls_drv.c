@@ -371,7 +371,7 @@ static void setup_dh(SSL_CTX *ctx)
 #define GET_PEER_CERTIFICATE 7
 #define GET_VERIFY_RESULT    8
 #define VERIFY_NONE 0x10000
-
+#define COMPRESSION_NONE 0x100000
 
 #define die_unless(cond, errstr)				\
 	 if (!(cond))						\
@@ -478,6 +478,11 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 
 	 if (flags & VERIFY_NONE)
 	    SSL_set_verify(d->ssl, SSL_VERIFY_NONE, verify_callback);
+
+#ifdef SSL_OP_NO_COMPRESSION
+	 if (flags & COMPRESSION_NONE)
+	     SSL_set_options(d->ssl, SSL_OP_NO_COMPRESSION);
+#endif
 
 	 d->bio_read = BIO_new(BIO_s_mem());
 	 d->bio_write = BIO_new(BIO_s_mem());

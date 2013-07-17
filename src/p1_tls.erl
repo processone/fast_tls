@@ -58,7 +58,9 @@
 
 -define(GET_VERIFY_RESULT, 8).
 
--define(VERIFY_NONE, 65536).
+-define(VERIFY_NONE, 16#10000).
+
+-define(COMPRESSION_NONE, 16#100000).
 
 -define(PRINT(Format, Args), io:format(Format, Args)).
 
@@ -111,10 +113,15 @@ tcp_to_tls(TCPSocket, Options) ->
       {value, {certfile, CertFile}} ->
 	  load_driver(),
 	  Port = open_port({spawn, "p1_tls_drv"}, [binary]),
-	  Flags = case lists:member(verify_none, Options) of
-		    true -> ?VERIFY_NONE;
-		    false -> 0
-		  end,
+	  Flags1 = case lists:member(verify_none, Options) of
+                       true -> ?VERIFY_NONE;
+                       false -> 0
+                   end,
+          Flags2 = case lists:member(compression_none, Options) of
+                       true -> ?COMPRESSION_NONE;
+                       false -> 0
+                   end,
+          Flags = Flags1 bor Flags2,
 	  Command = case lists:member(connect, Options) of
 		      true -> ?SET_CERTIFICATE_FILE_CONNECT;
 		      false -> ?SET_CERTIFICATE_FILE_ACCEPT
