@@ -44,7 +44,7 @@ typedef unsigned __int32 uint32_t;
 #define SSL_OP_NO_TICKET 0
 #endif
 
-#define CIPHERS "DEFAULT:!EXPORT:!LOW:!SSLv2"
+#define CIPHERS "DEFAULT:!EXPORT:!LOW:!RC4:!SSLv2"
 
 /*
  * R15B changed several driver callbacks to use ErlDrvSizeT and
