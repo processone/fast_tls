@@ -126,9 +126,16 @@ tcp_to_tls(TCPSocket, Options) ->
 		      true -> ?SET_CERTIFICATE_FILE_CONNECT;
 		      false -> ?SET_CERTIFICATE_FILE_ACCEPT
 		    end,
+          Ciphers =
+                case lists:keysearch(ciphers, 1, Options) of
+                    {value, {ciphers, C}} ->
+                        iolist_to_binary(C);
+                    false ->
+                        <<>>
+                end,
           CertFile1 = iolist_to_binary(CertFile),
 	  case port_control(Port, Command bor Flags,
-			    <<CertFile1/binary, 0>>)
+			    <<CertFile1/binary, 0, Ciphers/binary, 0>>)
 	      of
 	    <<0>> ->
 		{ok, #tlssock{tcpsock = TCPSocket, tlsport = Port}};

@@ -425,6 +425,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 if (is_key_file_modified(buf, &mtime) || ssl_ctx == NULL)
 	 {
 	    SSL_CTX *ctx;
+	    char *ciphers;
 
 	    hash_table_insert(buf, mtime, NULL);
 
@@ -440,7 +441,10 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    res = SSL_CTX_check_private_key(ctx);
 	    die_unless(res > 0, "SSL_CTX_check_private_key failed");
 
-	    SSL_CTX_set_cipher_list(ctx, CIPHERS);
+	    ciphers = buf + strlen(buf) + 1;
+	    if (strlen(ciphers) == 0)
+	       ciphers = CIPHERS;
+	    SSL_CTX_set_cipher_list(ctx, ciphers);
 
 #ifndef OPENSSL_NO_ECDH
 	    if (command == SET_CERTIFICATE_FILE_ACCEPT) {
