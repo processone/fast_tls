@@ -388,17 +388,9 @@ integer_to_binary(I) ->
     list_to_binary(integer_to_list(I)).
 
 get_so_path() ->
-    case os:getenv("EJABBERD_SO_PATH") of
-        false ->
-            case code:priv_dir(p1_tls) of
-                {error, _} ->
-                    filename:join(["priv", "lib"]);
-                Path ->
-                    filename:join([Path, "lib"])
-            end;
-        Path ->
-            Path
-    end.
+    EbinDir = filename:dirname(code:which(?MODULE)),
+    AppDir = filename:dirname(EbinDir),
+    filename:join([AppDir, "priv", "lib"]).
 
 load_driver() ->
     case erl_ddll:load_driver(get_so_path(), p1_tls_drv) of
