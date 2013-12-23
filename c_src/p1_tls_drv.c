@@ -34,7 +34,10 @@ typedef struct {
       BIO *bio_read;
       BIO *bio_write;
       SSL *ssl;
+      int handshakes;
 } tls_data;
+
+static int ssl_index;
 
 #ifdef _WIN32
 typedef unsigned __int32 uint32_t;
@@ -219,6 +222,7 @@ static ErlDrvData tls_drv_start(ErlDrvPort port, char *buff)
    d->bio_read = NULL;
    d->bio_write = NULL;
    d->ssl = NULL;
+   d->handshakes = 0;
 
    set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
 
@@ -362,6 +366,19 @@ static void setup_dh(SSL_CTX *ctx)
 }
 #endif
 
+static void ssl_info_callback(const SSL *s, int where, int ret)
+{
+   if (where == SSL_CB_ACCEPT_LOOP) {
+      int state = SSL_get_state(s);
+      if (state == SSL3_ST_SR_CLNT_HELLO_A ||
+	  state == SSL23_ST_SR_CLNT_HELLO_A) {
+	 tls_data *d = (tls_data *)SSL_get_ex_data(s, ssl_index);
+	 d->handshakes++;
+      }
+   }
+}
+
+
 #define SET_CERTIFICATE_FILE_ACCEPT 1
 #define SET_CERTIFICATE_FILE_CONNECT 2
 #define SET_ENCRYPTED_INPUT  3
@@ -473,6 +490,8 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 				  verify_callback);
 	    /* } */
 
+	    SSL_CTX_set_info_callback(ctx, &ssl_info_callback);
+
 	    ssl_ctx = ctx;
 	    hash_table_insert(buf, mtime, ssl_ctx);
 	 }
@@ -487,6 +506,8 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 if (flags & COMPRESSION_NONE)
 	     SSL_set_options(d->ssl, SSL_OP_NO_COMPRESSION);
 #endif
+
+	 SSL_set_ex_data(d->ssl, ssl_index, d);
 
 	 d->bio_read = BIO_new(BIO_s_mem());
 	 d->bio_write = BIO_new(BIO_s_mem());
@@ -568,6 +589,17 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 		  size *= 2;
 		  b = driver_realloc_binary(b, size);
 	       }
+	    }
+
+	    if (d->handshakes > 1) {
+	       char *error = "client renegotiations forbidden";
+	       int error_len = strlen(error);
+	       rlen = error_len + 1;
+	       b = driver_alloc_binary(rlen);
+	       b->orig_bytes[0] = 1;
+	       strncpy(b->orig_bytes + 1, error, error_len);
+	       *rbuf = (char *)b;
+	       return rlen;
 	    }
 
 	    if (res < 0)
@@ -658,6 +690,7 @@ DRIVER_INIT(p1_tls_drv) /* must match name in driver_entry */
    OpenSSL_add_ssl_algorithms();
    SSL_load_error_strings();
    init_hash_table();
+   ssl_index = SSL_get_ex_new_index(0, "ssl index", NULL, NULL, NULL);
    return &tls_driver_entry;
 }
 
