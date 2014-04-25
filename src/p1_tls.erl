@@ -320,13 +320,18 @@ loop(Port, Socket) ->
 -spec get_cert_verify_string(number(), cert()) -> binary().
 
 get_cert_verify_string(CertVerifyRes, Cert) ->
-    BCert = public_key:pkix_encode('Certificate', Cert,
-				   plain),
-    IsSelfsigned = public_key:pkix_is_self_signed(BCert),
-    case {CertVerifyRes, IsSelfsigned} of
-      {21, true} -> <<"self-signed certificate">>;
-      _ -> cert_verify_code(CertVerifyRes)
+    case catch cert_is_self_signed(Cert) of
+      {'EXIT', _} -> <<"unknown verification error">>;
+      IsSelfsigned ->
+	  case {CertVerifyRes, IsSelfsigned} of
+	    {21, true} -> <<"self-signed certificate">>;
+	    _ -> cert_verify_code(CertVerifyRes)
+	  end
     end.
+
+cert_is_self_signed(Cert) ->
+    BCert = public_key:pkix_encode('Certificate', Cert, plain),
+    public_key:pkix_is_self_signed(BCert).
 
 cert_verify_code(0) -> <<"ok">>;
 cert_verify_code(2) ->
