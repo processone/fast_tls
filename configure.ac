@@ -6,7 +6,7 @@ AC_PACKAGE_VERSION(0.2.0)
 AC_INIT(tls, 0.2.0, [], [])
 
 # Checks for programs.
-AC_PROG_CC
+AC_PROG_CC_C_O
 AC_PROG_MAKE_SET
 
 if test "x$GCC" = "xyes"; then
@@ -28,30 +28,5 @@ AC_ERLANG_NEED_ERLC
 # AC_ERLANG_SUBST_ROOT_DIR
 # AC_ERLANG_SUBST_LIB_DIR
 
-AC_CHECK_LIB(ssl, SSL_free, [SSL_LIB=yes], [], [])
-AC_CHECK_LIB(crypto, SHA1_Init, [CRYPTO_LIB=yes], [], [])
-AC_CHECK_HEADER(openssl/ssl.h, [SSL_HEADER=yes], [], [])
-AC_CHECK_HEADER(openssl/err.h, [ERR_HEADER=yes], [], [])
-AC_CHECK_HEADER(openssl/sha.h, [SHA_HEADER=yes], [], [])
-
-if test "x$SSL_LIB" = "x"; then
-   AC_MSG_ERROR([OpenSSL 'ssl' library was not found])
-fi
-
-if test "x$CRYPTO_LIB" = "x"; then
-   AC_MSG_ERROR([OpenSSL 'crypto' library was not found])
-fi
-
-if test "x$SSL_HEADER" = "x"; then
-   AC_MSG_ERROR([OpenSSL header file "openssl/ssl.h" was not found])
-fi
-
-if test "x$ERR_HEADER" = "x"; then
-   AC_MSG_ERROR([OpenSSL header file "openssl/err.h" was not found])
-fi
-
-if test "x$SHA_HEADER" = "x"; then
-   AC_MSG_ERROR([OpenSSL header file "openssl/sha.h" was not found])
-fi
-
-AC_OUTPUT
+PKG_CHECK_MODULES([OPENSSL], [openssl], [], AC_MSG_ERROR("Couldn't find OpenSSL"))
+AC_OUTPUT([rebar.config])
