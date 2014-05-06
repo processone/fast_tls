@@ -40,7 +40,7 @@ typedef struct {
 
 static int ssl_index;
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 typedef unsigned __int32 uint32_t;
 #endif
 
