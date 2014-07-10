@@ -140,9 +140,11 @@ tcp_to_tls(TCPSocket, Options) ->
                                      <<>>
                              end,
           CertFile1 = iolist_to_binary(CertFile),
-	  case port_control(Port, Command bor Flags,
-			    <<CertFile1/binary, 0, Ciphers/binary, 0, ProtocolOpts/binary, 0>>)
+	  case catch port_control(Port, Command bor Flags,
+				  <<CertFile1/binary, 0, Ciphers/binary,
+				    0, ProtocolOpts/binary, 0>>)
 	      of
+	    {'EXIT', {badarg, _}} -> {error, einval};
 	    <<0>> ->
 		{ok, #tlssock{tcpsock = TCPSocket, tlsport = Port}};
 	    <<1, Error/binary>> -> {error, (Error)}
@@ -166,9 +168,10 @@ recv(Socket, Length) -> recv(Socket, Length, infinity).
 recv(#tlssock{tcpsock = TCPSocket, tlsport = Port} =
 	 TLSSock,
      Length, Timeout) ->
-    case port_control(Port, ?GET_DECRYPTED_INPUT,
-		      <<Length:32>>)
+    case catch port_control(Port, ?GET_DECRYPTED_INPUT,
+			    <<Length:32>>)
 	of
+      {'EXIT', {badarg, _}} -> {error, einval};
       <<0>> ->
 	  case gen_tcp:recv(TCPSocket, 0, Timeout) of
 	    {ok, Packet} -> recv_data(TLSSock, Packet, Length);
@@ -197,13 +200,16 @@ recv_data(TLSSock, Packet, Length) ->
 recv_data1(#tlssock{tcpsock = TCPSocket,
 		    tlsport = Port},
 	   Packet, Length) ->
-    case port_control(Port, ?SET_ENCRYPTED_INPUT, Packet) of
+    case catch port_control(Port, ?SET_ENCRYPTED_INPUT, Packet) of
+      {'EXIT', {badarg, _}} -> {error, einval};
       <<0>> ->
-	  case port_control(Port, ?GET_DECRYPTED_INPUT,
-			    <<Length:32>>)
+	  case catch port_control(Port, ?GET_DECRYPTED_INPUT,
+				  <<Length:32>>)
 	      of
+	    {'EXIT', {badarg, _}} -> {error, einval};
 	    <<0, In/binary>> ->
-		case port_control(Port, ?GET_ENCRYPTED_OUTPUT, []) of
+		case catch port_control(Port, ?GET_ENCRYPTED_OUTPUT, []) of
+		  {'EXIT', {badarg, _}} -> {error, einval};
 		  <<0, Out/binary>> ->
 		      case gen_tcp:send(TCPSocket, Out) of
 			ok -> {ok, In};
@@ -222,10 +228,12 @@ recv_data1(#tlssock{tcpsock = TCPSocket,
 send(#tlssock{tcpsock = TCPSocket, tlsport = Port} =
 	 TLSSock,
      Packet) ->
-    case port_control(Port, ?SET_DECRYPTED_OUTPUT, Packet)
+    case catch port_control(Port, ?SET_DECRYPTED_OUTPUT, Packet)
 	of
+      {'EXIT', {badarg, _}} -> {error, einval};
       <<0>> ->
-	  case port_control(Port, ?GET_ENCRYPTED_OUTPUT, []) of
+	  case catch port_control(Port, ?GET_ENCRYPTED_OUTPUT, []) of
+	    {'EXIT', {badarg, _}} -> {error, einval};
 	    <<0, Out/binary>> -> gen_tcp:send(TCPSocket, Out);
 	    <<1, Error/binary>> -> {error, (Error)}
 	  end;
@@ -261,7 +269,8 @@ close(#tlssock{tcpsock = TCPSocket, tlsport = Port}) ->
 -spec get_peer_certificate(tls_socket()) -> error | {ok, cert()}.
 
 get_peer_certificate(#tlssock{tlsport = Port}) ->
-    case port_control(Port, ?GET_PEER_CERTIFICATE, []) of
+    case catch port_control(Port, ?GET_PEER_CERTIFICATE, []) of
+      {'EXIT', {badarg, _}} -> error;
       <<0, BCert/binary>> ->
 	  case catch public_key:pkix_decode_cert(BCert, plain)
 	      of
