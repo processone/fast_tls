@@ -499,14 +499,10 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    SSL_CTX_set_cipher_list(ctx, ciphers);
 
 #ifndef OPENSSL_NO_ECDH
-	    if (command == SET_CERTIFICATE_FILE_ACCEPT) {
-		setup_ecdh(ctx);
-	    }
+	    setup_ecdh(ctx);
 #endif
 #ifndef OPENSSL_NO_DH
-	    if (command == SET_CERTIFICATE_FILE_ACCEPT) {
-		setup_dh(ctx);
-	    }
+	    setup_dh(ctx);
 #endif
 
 	    SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
