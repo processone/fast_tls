@@ -725,6 +725,7 @@ ErlDrvEntry tls_driver_entry = {
 
 DRIVER_INIT(p1_tls_drv) /* must match name in driver_entry */
 {
+   CRYPTO_set_mem_functions(driver_alloc, driver_realloc, driver_free);
    OpenSSL_add_ssl_algorithms();
    SSL_load_error_strings();
    init_hash_table();
