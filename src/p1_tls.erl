@@ -5,7 +5,7 @@
 %%% Created : 24 Jul 2004 by Alexey Shchepin <alexey@process-one.net>
 %%%
 %%%
-%%% p1_tls, Copyright (C) 2002-2013   ProcessOne
+%%% p1_tls, Copyright (C) 2002-2015   ProcessOne
 %%%
 %%% This program is free software; you can redistribute it and/or
 %%% modify it under the terms of the GNU General Public License as
