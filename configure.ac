@@ -53,5 +53,5 @@ fi
 if test "x$SHA_HEADER" = "x"; then
    AC_MSG_ERROR([OpenSSL header file "openssl/sha.h" was not found])
 fi
-
+AC_CONFIG_FILES([vars.config])
 AC_OUTPUT
