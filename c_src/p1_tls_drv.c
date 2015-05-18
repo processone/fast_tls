@@ -592,9 +592,11 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 BIO_read(d->bio_write, b->orig_bytes + 1, size - 1);
 	 *rbuf = (char *)b;
 	 return size;
-      case GET_DECRYPTED_INPUT:
+      case GET_DECRYPTED_INPUT: {
+	 int retcode = 0;
 	 if (!SSL_is_init_finished(d->ssl))
 	 {
+	    retcode = 2;
 	    res = SSL_do_handshake(d->ssl);
 	    if (res <= 0)
 	       die_unless(SSL_get_error(d->ssl, res) == SSL_ERROR_WANT_READ,
@@ -611,7 +613,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    size = BUF_SIZE + 1;
 	    rlen = 1;
 	    b = driver_alloc_binary(size);
-	    b->orig_bytes[0] = 0;
+	    b->orig_bytes[0] = retcode;
 
 	    res = 0;
 
@@ -654,8 +656,14 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    b = driver_realloc_binary(b, rlen);
 	    *rbuf = (char *)b;
 	    return rlen;
+	 } else {
+	    b = driver_alloc_binary(1);
+	    b->orig_bytes[0] = 2;
+	    *rbuf = (char *)b;
+	    return 1;
 	 }
 	 break;
+      }
       case GET_PEER_CERTIFICATE:
 	 cert = SSL_get_peer_certificate(d->ssl);
 	 if (cert == NULL)

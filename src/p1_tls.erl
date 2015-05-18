@@ -207,7 +207,8 @@ recv_data1(#tlssock{tcpsock = TCPSocket,
 				  <<Length:32>>)
 	      of
 	    {'EXIT', {badarg, _}} -> {error, einval};
-	    <<0, In/binary>> ->
+	    <<0, In/binary>> -> {ok, In};
+	    <<2, In/binary>> ->
 		case catch port_control(Port, ?GET_ENCRYPTED_OUTPUT, []) of
 		  {'EXIT', {badarg, _}} -> {error, einval};
 		  <<0, Out/binary>> ->
