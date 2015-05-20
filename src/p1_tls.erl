@@ -226,8 +226,7 @@ recv_data1(#tlssock{tcpsock = TCPSocket,
 -spec send(tls_socket(), binary()) -> ok | {error, inet:posix() |
                                             binary() | timeout}.
 
-send(#tlssock{tcpsock = TCPSocket, tlsport = Port} =
-	 TLSSock,
+send(#tlssock{tcpsock = TCPSocket, tlsport = Port},
      Packet) ->
     case catch port_control(Port, ?SET_DECRYPTED_OUTPUT, Packet)
 	of
@@ -238,12 +237,7 @@ send(#tlssock{tcpsock = TCPSocket, tlsport = Port} =
 	    <<0, Out/binary>> -> gen_tcp:send(TCPSocket, Out);
 	    <<1, Error/binary>> -> {error, (Error)}
 	  end;
-      <<1, Error/binary>> -> {error, (Error)};
-      <<2>> -> % Dirty hack
-	  receive
-	    {timeout, _Timer, _} -> {error, timeout}
-	    after 100 -> send(TLSSock, Packet)
-	  end
+      <<1, Error/binary>> -> {error, Error}
     end.
 
 -spec setopts(tls_socket(), list()) -> ok | {error, inet:posix()}.

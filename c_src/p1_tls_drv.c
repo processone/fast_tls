@@ -36,6 +36,12 @@ typedef struct {
       BIO *bio_write;
       SSL *ssl;
       int handshakes;
+      char *send_buffer;
+      int send_buffer_size;
+      int send_buffer_len;
+      char *send_buffer2;
+      int send_buffer2_size;
+      int send_buffer2_len;
 } tls_data;
 
 static int ssl_index;
@@ -238,6 +244,12 @@ static ErlDrvData tls_drv_start(ErlDrvPort port, char *buff)
    d->bio_write = NULL;
    d->ssl = NULL;
    d->handshakes = 0;
+   d->send_buffer = NULL;
+   d->send_buffer_len = 0;
+   d->send_buffer_size = 0;
+   d->send_buffer2 = NULL;
+   d->send_buffer2_len = 0;
+   d->send_buffer2_size = 0;
 
    set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
 
@@ -250,6 +262,10 @@ static void tls_drv_stop(ErlDrvData handle)
 
    if (d->ssl != NULL)
       SSL_free(d->ssl);
+   if (d->send_buffer != NULL)
+      driver_free(d->send_buffer);
+   if (d->send_buffer2 != NULL)
+      driver_free(d->send_buffer2);
 
    driver_free((char *)handle);
 }
@@ -569,18 +585,41 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
       case SET_DECRYPTED_OUTPUT:
 	 die_unless(d->ssl, "SSL not initialized");
 
-	 res = SSL_write(d->ssl, buf, len);
-	 if (res <= 0) 
-	 {
-	    res = SSL_get_error(d->ssl, res);
-	    if (res == SSL_ERROR_WANT_READ || res == SSL_ERROR_WANT_WRITE) 
-	    {
-	       b = driver_alloc_binary(1);
-	       b->orig_bytes[0] = 2;
-	       *rbuf = (char *)b;
-	       return 1;
+	 if (len > 0) {
+	    if (d->send_buffer != NULL) {
+	       if (d->send_buffer2 == NULL) {
+		  d->send_buffer2_len = len;
+		  d->send_buffer2_size = len;
+		  d->send_buffer2 = driver_alloc(d->send_buffer2_size);
+		  memcpy(d->send_buffer2, buf, len);
+	       } else {
+		  if (d->send_buffer2_size <
+		      d->send_buffer2_len + len) {
+		     while (d->send_buffer2_size <
+			    d->send_buffer2_len + len) {
+			d->send_buffer2_size *= 2;
+		     }
+		     driver_realloc(d->send_buffer2,
+				    d->send_buffer2_size);
+		  }
+		  memcpy(d->send_buffer2 + d->send_buffer2_len,
+			 buf, len);
+		  d->send_buffer2_len += len;
+	       }
 	    } else {
-	       die_unless(0, "SSL_write failed");
+	       res = SSL_write(d->ssl, buf, len);
+	       if (res <= 0) {
+		  res = SSL_get_error(d->ssl, res);
+		  if (res == SSL_ERROR_WANT_READ ||
+		      res == SSL_ERROR_WANT_WRITE) {
+		     d->send_buffer_len = len;
+		     d->send_buffer_size = len;
+		     d->send_buffer = driver_alloc(d->send_buffer_size);
+		     memcpy(d->send_buffer, buf, len);
+		  } else {
+		     die_unless(0, "SSL_write failed");
+		  }
+	       }
 	    }
 	 }
 	 break;
@@ -604,6 +643,22 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 }
 	 if (SSL_is_init_finished(d->ssl)) {
 	    size_t req_size = 0;
+	    int i;
+	    for (i = 0; i < 2; i++)
+	       if (d->send_buffer != NULL) {
+		  res = SSL_write(d->ssl, d->send_buffer, d->send_buffer_len);
+		  if (res <= 0) {
+		     die_unless(0, "SSL_write failed");
+		  }
+		  retcode = 2;
+		  d->send_buffer = d->send_buffer2;
+		  d->send_buffer_len = d->send_buffer2_len;
+		  d->send_buffer_size = d->send_buffer2_size;
+		  d->send_buffer2 = NULL;
+		  d->send_buffer2_len = 0;
+		  d->send_buffer2_size = 0;
+	       }
+
 	    if (len == 4)
 	    {
 	       unsigned char *b = (unsigned char *)buf;
