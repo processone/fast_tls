@@ -110,7 +110,8 @@ static uint32_t str_hash(char *s)
 struct bucket {
       uint32_t hash;
       char *key;
-      time_t mtime;
+      time_t key_mtime;
+      time_t dh_mtime;
       SSL_CTX *ssl_ctx;
       struct bucket *next;
 };
@@ -136,7 +137,8 @@ static void init_hash_table()
    
 }
 
-static void hash_table_insert(char *key, time_t mtime, SSL_CTX *ssl_ctx)
+static void hash_table_insert(char *key, time_t key_mtime, time_t dh_mtime,
+			      SSL_CTX *ssl_ctx)
 {
    int level, split;
    uint32_t hash = str_hash(key);
@@ -155,7 +157,8 @@ static void hash_table_insert(char *key, time_t mtime, SSL_CTX *ssl_ctx)
    el = ht.buckets[bucket];
    while (el != NULL) {
       if (el->hash == hash && strcmp(el->key, key) == 0) {
-	 el->mtime = mtime;
+	 el->key_mtime = key_mtime;
+	 el->dh_mtime = dh_mtime;
 	 if (el->ssl_ctx != NULL)
 	    SSL_CTX_free(el->ssl_ctx);
 	 el->ssl_ctx = ssl_ctx;
@@ -172,7 +175,8 @@ static void hash_table_insert(char *key, time_t mtime, SSL_CTX *ssl_ctx)
       new_bucket_el->hash = hash;
       new_bucket_el->key = (char *)driver_alloc(strlen(key) + 1);
       strcpy(new_bucket_el->key, key);
-      new_bucket_el->mtime = mtime;
+      new_bucket_el->key_mtime = key_mtime;
+      new_bucket_el->dh_mtime = dh_mtime;
       new_bucket_el->ssl_ctx = ssl_ctx;
       new_bucket_el->next = ht.buckets[bucket];
       ht.buckets[bucket] = new_bucket_el;
@@ -209,7 +213,8 @@ static void hash_table_insert(char *key, time_t mtime, SSL_CTX *ssl_ctx)
    }
 }
 
-static SSL_CTX *hash_table_lookup(char *key, time_t *pmtime)
+static SSL_CTX *hash_table_lookup(char *key, time_t *key_mtime,
+				  time_t *dh_mtime)
 {
    int level, split;
    uint32_t hash = str_hash(key);
@@ -226,7 +231,8 @@ static SSL_CTX *hash_table_lookup(char *key, time_t *pmtime)
    el = ht.buckets[bucket];
    while (el != NULL) {
       if (el->hash == hash && strcmp(el->key, key) == 0) {
-	 *pmtime = el->mtime;
+	 *key_mtime = el->key_mtime;
+	 *dh_mtime = el->dh_mtime;
 	 return el->ssl_ctx;
       }
       el = el->next;
@@ -290,18 +296,19 @@ static void tls_drv_finish()
    driver_free(ht.buckets);
 }
 
-static int is_key_file_modified(char *file, time_t *key_file_mtime)
+static int is_modified(char *file, time_t *known_mtime)
 {
    struct stat file_stat;
 
-   if (stat(file, &file_stat))
-   {
-      *key_file_mtime = 0;
+   if (file == NULL) {
+      return 0;
+   } else if (stat(file, &file_stat)) {
+      *known_mtime = 0;
       return 1;
    } else {
-      if (*key_file_mtime != file_stat.st_mtime)
+      if (*known_mtime != file_stat.st_mtime)
       {
-	 *key_file_mtime = file_stat.st_mtime;
+	 *known_mtime = file_stat.st_mtime;
 	 return 1;
       } else
 	 return 0;
@@ -374,26 +381,41 @@ static unsigned char dh1024_g[] = {
    0x85,0x5E,0x6E,0xEB,0x22,0xB3,0xB2,0xE5,
 };
 
-static void setup_dh(SSL_CTX *ctx)
+static int setup_dh(SSL_CTX *ctx, char *dh_file)
 {
    DH *dh;
+   int res;
 
-   dh = DH_new();
-   if (dh == NULL) {
-      return;
-   }
+   if (dh_file != NULL) {
+      BIO *bio = BIO_new_file(dh_file, "r");
 
-   dh->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
-   dh->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
-   if (dh->p == NULL || dh->g == NULL) {
-      DH_free(dh);
-      return;
+      if (bio == NULL) {
+	 return 0;
+      }
+      dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
+      BIO_free(bio);
+      if (dh == NULL) {
+	 return 0;
+      }
+   } else {
+      dh = DH_new();
+      if (dh == NULL) {
+	 return 0;
+      }
+
+      dh->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
+      dh->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
+      if (dh->p == NULL || dh->g == NULL) {
+	 DH_free(dh);
+	 return 0;
+      }
    }
 
    SSL_CTX_set_options(ctx, SSL_OP_SINGLE_DH_USE);
-   SSL_CTX_set_tmp_dh(ctx, dh);
+   res = (int)SSL_CTX_set_tmp_dh(ctx, dh);
 
    DH_free(dh);
+   return res;
 }
 #endif
 
@@ -505,15 +527,20 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
    {
       case SET_CERTIFICATE_FILE_ACCEPT:
       case SET_CERTIFICATE_FILE_CONNECT: {
-	 time_t mtime = 0;
-	 size_t buf_len = strlen(buf);
-	 char *ciphers = buf + buf_len + 1;
+	 time_t key_mtime = 0;
+	 time_t dh_mtime = 0;
+	 char *key_file = buf;
+	 size_t key_file_len = strlen(key_file);
+	 char *ciphers = key_file + key_file_len + 1;
 	 size_t ciphers_len = strlen(ciphers);
 	 char *protocol_options = ciphers + ciphers_len + 1;
-	 char *hash_key = (char *)driver_alloc(buf_len + ciphers_len + 1);
+	 size_t protocol_options_len = strlen(protocol_options);
+	 char *dh_file = protocol_options + protocol_options_len + 1;
+	 size_t dh_file_len = strlen(dh_file);
+	 char *hash_key = (char *)driver_alloc(key_file_len + ciphers_len + 1);
 	 long options = 0L;
 
-	 if (strlen(protocol_options) != 0) {
+	 if (protocol_options_len != 0) {
 	    char *po = strdup(protocol_options), delim[] = "|";
 	    char *popts = po;
 	    char *strtok_buf;
@@ -526,22 +553,27 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    free(popts);
 	 }
 
-	 sprintf(hash_key, "%s%s", buf, ciphers);
-	 SSL_CTX *ssl_ctx = hash_table_lookup(hash_key, &mtime);
+	 sprintf(hash_key, "%s%s", key_file, ciphers);
+	 SSL_CTX *ssl_ctx = hash_table_lookup(hash_key, &key_mtime, &dh_mtime);
 
-	 if (is_key_file_modified(buf, &mtime) || ssl_ctx == NULL)
+	 if (dh_file_len == 0)
+	    dh_file = NULL;
+
+	 if (is_modified(key_file, &key_mtime) ||
+	     is_modified(dh_file, &dh_mtime) ||
+	     ssl_ctx == NULL)
 	 {
 	    SSL_CTX *ctx;
 
-	    hash_table_insert(hash_key, mtime, NULL);
+	    hash_table_insert(hash_key, key_mtime, dh_mtime, NULL);
 
 	    ctx = SSL_CTX_new(SSLv23_method());
 	    die_unless(ctx, "SSL_CTX_new failed");
 
-	    res = SSL_CTX_use_certificate_chain_file(ctx, buf);
+	    res = SSL_CTX_use_certificate_chain_file(ctx, key_file);
 	    die_unless(res > 0, "SSL_CTX_use_certificate_file failed");
 
-	    res = SSL_CTX_use_PrivateKey_file(ctx, buf, SSL_FILETYPE_PEM);
+	    res = SSL_CTX_use_PrivateKey_file(ctx, key_file, SSL_FILETYPE_PEM);
 	    die_unless(res > 0, "SSL_CTX_use_PrivateKey_file failed");
 
 	    res = SSL_CTX_check_private_key(ctx);
@@ -555,7 +587,8 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    setup_ecdh(ctx);
 #endif
 #ifndef OPENSSL_NO_DH
-	    setup_dh(ctx);
+	    res = setup_dh(ctx, dh_file);
+	    die_unless(res > 0, "Setting DH parameters failed");
 #endif
 
 	    SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
@@ -577,7 +610,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    SSL_CTX_set_info_callback(ctx, &ssl_info_callback);
 
 	    ssl_ctx = ctx;
-	    hash_table_insert(hash_key, mtime, ssl_ctx);
+	    hash_table_insert(hash_key, key_mtime, dh_mtime, ssl_ctx);
 	 }
 
 	 driver_free(hash_key);
