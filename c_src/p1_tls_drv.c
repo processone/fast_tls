@@ -537,7 +537,10 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 size_t protocol_options_len = strlen(protocol_options);
 	 char *dh_file = protocol_options + protocol_options_len + 1;
 	 size_t dh_file_len = strlen(dh_file);
-	 char *hash_key = (char *)driver_alloc(key_file_len + ciphers_len + 1);
+	 char *hash_key = (char *)driver_alloc(key_file_len +
+					       ciphers_len +
+					       protocol_options_len +
+					       dh_file_len + 1);
 	 long options = 0L;
 
 	 if (protocol_options_len != 0) {
@@ -553,7 +556,8 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    free(popts);
 	 }
 
-	 sprintf(hash_key, "%s%s", key_file, ciphers);
+	 sprintf(hash_key, "%s%s%s%s", key_file, ciphers, protocol_options,
+		 dh_file);
 	 SSL_CTX *ssl_ctx = hash_table_lookup(hash_key, &key_mtime, &dh_mtime);
 
 	 if (dh_file_len == 0)
