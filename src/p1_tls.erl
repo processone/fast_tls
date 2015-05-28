@@ -165,20 +165,16 @@ recv(Socket, Length) -> recv(Socket, Length, infinity).
                          {error, binary()} |
                          {ok, binary()}.
 
-recv(#tlssock{tcpsock = TCPSocket, tlsport = Port} =
+recv(#tlssock{tcpsock = TCPSocket} =
 	 TLSSock,
      Length, Timeout) ->
-    case catch port_control(Port, ?GET_DECRYPTED_INPUT,
-			    <<Length:32>>)
-	of
-      {'EXIT', {badarg, _}} -> {error, einval};
-      <<0>> ->
-	  case gen_tcp:recv(TCPSocket, 0, Timeout) of
-	    {ok, Packet} -> recv_data(TLSSock, Packet, Length);
-	    {error, _Reason} = Error -> Error
-	  end;
-      <<0, In/binary>> -> {ok, In};
-      <<1, Error/binary>> -> {error, (Error)}
+    case recv_data(TLSSock, <<>>, Length) of
+        {ok, <<>>} ->
+            case gen_tcp:recv(TCPSocket, 0, Timeout) of
+                {ok, Packet} -> recv_data(TLSSock, Packet, Length);
+                {error, _Reason} = Error -> Error
+            end;
+        Res -> Res
     end.
 
 -spec recv_data(tls_socket(), binary()) -> {error, inet:posix() | binary()} |
