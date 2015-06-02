@@ -139,10 +139,17 @@ tcp_to_tls(TCPSocket, Options) ->
                                  false ->
                                      <<>>
                              end,
+          DHFile = case lists:keysearch(dhfile, 1, Options) of
+                       {value, {dhfile, D}} ->
+                           iolist_to_binary(D);
+                       false ->
+                           <<>>
+                   end,
           CertFile1 = iolist_to_binary(CertFile),
 	  case catch port_control(Port, Command bor Flags,
 				  <<CertFile1/binary, 0, Ciphers/binary,
-				    0, ProtocolOpts/binary, 0>>)
+				    0, ProtocolOpts/binary, 0, DHFile/binary,
+				    0>>)
 	      of
 	    {'EXIT', {badarg, _}} -> {error, einval};
 	    <<0>> ->
