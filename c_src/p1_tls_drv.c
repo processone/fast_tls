@@ -673,8 +673,8 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 			    d->send_buffer2_len + len) {
 			d->send_buffer2_size *= 2;
 		     }
-		     driver_realloc(d->send_buffer2,
-				    d->send_buffer2_size);
+		     d->send_buffer2 = driver_realloc(d->send_buffer2,
+						      d->send_buffer2_size);
 		  }
 		  memcpy(d->send_buffer2 + d->send_buffer2_len,
 			 buf, len);
@@ -725,6 +725,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 		     die_unless(0, "SSL_write failed");
 		  }
 		  retcode = 2;
+		  driver_free(d->send_buffer);
 		  d->send_buffer = d->send_buffer2;
 		  d->send_buffer_len = d->send_buffer2_len;
 		  d->send_buffer_size = d->send_buffer2_size;
