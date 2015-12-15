@@ -402,13 +402,10 @@ cert_verify_code(X) ->
 integer_to_binary(I) ->
     list_to_binary(integer_to_list(I)).
 
-get_so_path() ->
-    EbinDir = filename:dirname(code:which(?MODULE)),
-    AppDir = filename:dirname(EbinDir),
-    filename:join([AppDir, "priv", "lib"]).
-
 load_driver() ->
-    case erl_ddll:load_driver(get_so_path(), p1_tls_drv) of
+    SOPath = p1_nif_utils:get_so_path(p1_tls, [fast_tls, p1_tls], "p1_tls_drv"),
+    Dir = filename:dirname(SOPath),
+    case erl_ddll:load_driver(Dir, "p1_tls_drv") of
         ok ->
             ok;
         {error, already_loaded} ->
