@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.53)
-AC_PACKAGE_VERSION(0.2.0)
-AC_INIT(tls, 0.2.0, [], [])
+AC_PACKAGE_VERSION(1.0.0)
+AC_INIT(tls, 1.0.0, [], [])
 
 # Checks for programs.
 AC_PROG_CC
@@ -53,5 +53,16 @@ fi
 if test "x$SHA_HEADER" = "x"; then
    AC_MSG_ERROR([OpenSSL header file "openssl/sha.h" was not found])
 fi
+
+AC_ARG_ENABLE(gcov,
+[AC_HELP_STRING([--enable-gcov], [compile with gcov enabled (default: no)])],
+[case "${enableval}" in
+  yes) gcov=true ;;
+  no)  gcov=false ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-gcov) ;;
+esac],[gcov=false])
+
+AC_SUBST(gcov)
+
 AC_CONFIG_FILES([vars.config])
 AC_OUTPUT
