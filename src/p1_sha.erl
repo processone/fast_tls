@@ -37,7 +37,7 @@
 %%% API functions
 %%%===================================================================
 load_nif() ->
-    SOPath = p1_nif_utils:get_so_path(?MODULE, [tls, fast_tls], "p1_sha"),
+    SOPath = p1_nif_utils:get_so_path(?MODULE, [fast_tls], "p1_sha"),
     case catch erlang:load_nif(SOPath, 0) of
         ok ->
             ok;
