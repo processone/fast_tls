@@ -81,7 +81,7 @@ sha512(_Text) ->
 -ifdef(TEST).
 
 load_nif_test() ->
-    ?assertEqual(ok, load_nif(filename:join(["..", "priv", "lib"]))).
+    ?assertEqual(ok, load_nif()).
 
 sha1_test() ->
     ?assertEqual(
