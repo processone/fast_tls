@@ -25,7 +25,7 @@
 
 -author('alexey@process-one.net').
 
--export([load_nif/0, load_nif/1,
+-export([load_nif/0,
          sha/1, sha1/1, sha224/1, sha256/1,
          sha384/1, sha512/1, to_hexlist/1]).
 
@@ -37,10 +37,7 @@
 %%% API functions
 %%%===================================================================
 load_nif() ->
-    load_nif(get_so_path()).
-
-load_nif(LibDir) ->
-    SOPath = filename:join(LibDir, "p1_sha"),
+    SOPath = p1_nif_utils:get_so_path(?MODULE, [tls, fast_tls], "p1_sha"),
     case catch erlang:load_nif(SOPath, 0) of
         ok ->
             ok;
@@ -48,7 +45,7 @@ load_nif(LibDir) ->
             error_logger:warning_msg("unable to load sha NIF: ~p~n", [Err]),
             Err
     end.
-
+ 
 -spec to_hexlist(iodata()) -> binary().
 -spec sha(iodata()) -> binary().
 -spec sha1(iodata()) -> binary().
@@ -77,14 +74,6 @@ sha384(_Text) ->
 
 sha512(_Text) ->
     erlang:nif_error(nif_not_loaded).
-
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
-get_so_path() ->
-    EbinDir = filename:dirname(code:which(?MODULE)),
-    AppDir = filename:dirname(EbinDir),
-    filename:join([AppDir, "priv", "lib"]).
 
 %%%===================================================================
 %%% Unit tests
