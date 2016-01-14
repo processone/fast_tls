@@ -22,7 +22,7 @@
 %%%----------------------------------------------------------------------
 
 {application, p1_tls,
- [{description,  "TLS / SSL native driver for Erlang / Elixir"},
+ [{description,  "TLS / SSL OpenSSL-based native driver for Erlang / Elixir"},
   {vsn,          "1.0.0"},
   {modules,      []},
   {registered,   []},
