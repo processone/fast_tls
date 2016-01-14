@@ -1,7 +1,7 @@
 %%%----------------------------------------------------------------------
-%%% File    : p1_tls_sup.erl
+%%% File    : fast_tls_sup.erl
 %%% Author  : Evgeniy Khramtsov <ekhramtsov@process-one.net>
-%%% Purpose : p1_tls supervisor
+%%% Purpose : fast_tls supervisor
 %%% Created : 4 Apr 2013 by Evgeniy Khramtsov <ekhramtsov@process-one.net>
 %%%
 %%%
@@ -21,7 +21,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(p1_tls_sup).
+-module(fast_tls_sup).
 
 -behaviour(supervisor).
 
@@ -65,8 +65,8 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    TLS = {p1_tls, {p1_tls, start_link, []},
-           permanent, brutal_kill, worker, [p1_tls]},
+    TLS = {fast_tls, {fast_tls, start_link, []},
+           permanent, brutal_kill, worker, [fast_tls]},
     {ok, {{one_for_one, 10, 1}, [TLS]}}.
 
 %%%===================================================================

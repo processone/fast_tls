@@ -838,7 +838,7 @@ ErlDrvEntry tls_driver_entry = {
    NULL,			/* F_PTR output, called when erlang has sent */
    NULL,			/* F_PTR ready_input, called when input descriptor ready */
    NULL,			/* F_PTR ready_output, called when output descriptor ready */
-   "p1_tls_drv",		/* char *driver_name, the argument to open_port */
+   "fast_tls_drv",		/* char *driver_name, the argument to open_port */
    tls_drv_finish,		/* F_PTR finish, called when unloaded */
    NULL,			/* handle */
    tls_drv_control,		/* F_PTR control, port_command callback */
@@ -858,7 +858,7 @@ ErlDrvEntry tls_driver_entry = {
   NULL                  /* stop_select */
 };
 
-DRIVER_INIT(p1_tls_drv) /* must match name in driver_entry */
+DRIVER_INIT(fast_tls_drv) /* must match name in driver_entry */
 {
    CRYPTO_set_mem_functions(driver_alloc, driver_realloc, driver_free);
    OpenSSL_add_ssl_algorithms();

@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% File    : p1_tls.erl
+%%% File    : fast_tls.erl
 %%% Author  : Alexey Shchepin <alexey@process-one.net>
 %%% Purpose : Interface to openssl
 %%% Created : 24 Jul 2004 by Alexey Shchepin <alexey@process-one.net>
@@ -21,7 +21,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(p1_tls).
+-module(fast_tls).
 
 -author('alexey@process-one.net').
 
@@ -109,7 +109,7 @@ tcp_to_tls(TCPSocket, Options) ->
     case lists:keysearch(certfile, 1, Options) of
       {value, {certfile, CertFile}} ->
 	  load_driver(),
-	  Port = open_port({spawn, "p1_tls_drv"}, [binary]),
+	  Port = open_port({spawn, "fast_tls_drv"}, [binary]),
 	  Flags1 = case lists:member(verify_none, Options) of
                        true -> ?VERIFY_NONE;
                        false -> 0
@@ -284,7 +284,7 @@ get_verify_result(#tlssock{tlsport = Port}) ->
 
 test() ->
     load_driver(),
-    Port = open_port({spawn, "p1_tls_drv"}, [binary]),
+    Port = open_port({spawn, "fast_tls_drv"}, [binary]),
     ?PRINT("open_port: ~p~n", [Port]),
     PCRes = port_control(Port, ?SET_CERTIFICATE_FILE_ACCEPT,
 			 <<"./ssl.pem", 0>>),
@@ -403,9 +403,9 @@ integer_to_binary(I) ->
     list_to_binary(integer_to_list(I)).
 
 load_driver() ->
-    SOPath = p1_nif_utils:get_so_path(p1_tls, [fast_tls, p1_tls], "p1_tls_drv"),
+    SOPath = p1_nif_utils:get_so_path(fast_tls, [fast_tls], "fast_tls_drv"),
     Dir = filename:dirname(SOPath),
-    case erl_ddll:load_driver(Dir, "p1_tls_drv") of
+    case erl_ddll:load_driver(Dir, "fast_tls_drv") of
         ok ->
             ok;
         {error, already_loaded} ->

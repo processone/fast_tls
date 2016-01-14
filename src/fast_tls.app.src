@@ -21,13 +21,13 @@
 %%%
 %%%----------------------------------------------------------------------
 
-{application, p1_tls,
+{application, fast_tls,
  [{description,  "TLS / SSL OpenSSL-based native driver for Erlang / Elixir"},
   {vsn,          "1.0.0"},
   {modules,      []},
   {registered,   []},
   {applications, [kernel, stdlib]},
-  {mod,          {p1_tls_app,[]}}]}.
+  {mod,          {fast_tls_app,[]}}]}.
 
 %% Local Variables:
 %% mode: erlang

@@ -1,7 +1,7 @@
 %%%----------------------------------------------------------------------
-%%% File    : p1_tls_app.erl
+%%% File    : fast_tls_app.erl
 %%% Author  : Evgeniy Khramtsov <ekhramtsov@process-one.net>
-%%% Purpose : p1_tls application
+%%% Purpose : fast_tls application
 %%% Created : 4 Apr 2013 by Evgeniy Khramtsov <ekhramtsov@process-one.net>
 %%%
 %%%
@@ -21,7 +21,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(p1_tls_app).
+-module(fast_tls_app).
 
 -behaviour(application).
 
@@ -51,7 +51,7 @@
 start(_StartType, _StartArgs) ->
     ok =  application:ensure_started(crypto),
     ok =  p1_sha:load_nif(),
-    p1_tls_sup:start_link().
+    fast_tls_sup:start_link().
 
 
 %%--------------------------------------------------------------------
