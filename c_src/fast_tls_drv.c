@@ -757,6 +757,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 return size;
       case GET_DECRYPTED_INPUT: {
 	 int retcode = 0;
+	 die_unless(d->ssl, "SSL not initialized");
 	 if (!SSL_is_init_finished(d->ssl))
 	 {
 	    retcode = 2;
