@@ -53,6 +53,46 @@ typedef unsigned __int32 uint32_t;
 
 #define CIPHERS "DEFAULT:!EXPORT:!LOW:!RC4:!SSLv2"
 
+/* Wrappers around driver_alloc() that check  */
+/* for OOM.                                   */
+void erl_exit(int n, char*, ...);
+void *ftls_alloc(ErlDrvSizeT size);
+void *ftls_realloc(void *ptr, ErlDrvSizeT size);
+ErlDrvBinary *ftls_alloc_binary(ErlDrvSizeT size);
+ErlDrvBinary *ftls_realloc_binary(ErlDrvBinary *bin, ErlDrvSizeT size);
+
+void *ftls_alloc(ErlDrvSizeT size) {
+    void *p = driver_alloc(size);
+    if (p == NULL) {
+        erl_exit(1, "fast_tls: Can't allocate %lu bytes of memory\n", size);
+    }
+    return p;
+}
+
+void *ftls_realloc(void *ptr, ErlDrvSizeT size) {
+    void *p = driver_realloc(ptr, size);
+    if (p == NULL) {
+        erl_exit(1, "fast_tls: Can't reallocate %lu bytes of memory\n", size);
+    }
+    return p;
+}
+
+ErlDrvBinary *ftls_alloc_binary(ErlDrvSizeT size) {
+    ErlDrvBinary *p = driver_alloc_binary(size);
+    if (p == NULL) {
+        erl_exit(1, "fast_tls: Can't allocate %lu binary\n", size);
+    }
+    return p;
+}
+
+ErlDrvBinary *ftls_realloc_binary(ErlDrvBinary *bin, ErlDrvSizeT size) {
+    ErlDrvBinary *p = driver_realloc_binary(bin, size);
+    if (p == NULL) {
+        erl_exit(1, "fast_tls: Can't reallocate %lu binary\n", size);
+    }
+    return p;
+}
+
 /**
  * Prepare the SSL options flag.
  **/
@@ -127,7 +167,7 @@ static void init_hash_table()
 {
    size_t size = 1 << (MIN_LEVEL + 1);
    size_t i;
-   ht.buckets = (struct bucket **)driver_alloc(sizeof(struct bucket *) * size);
+   ht.buckets = ftls_alloc(sizeof(struct bucket *) * size);
    ht.split = 0;
    ht.level = MIN_LEVEL;
    for (i = 0; i < size; i++)
@@ -170,9 +210,9 @@ static void hash_table_insert(char *key, time_t key_mtime, time_t dh_mtime,
       if (ht.buckets[bucket] != NULL)
 	 do_split = !0;
 
-      new_bucket_el = (struct bucket *)driver_alloc(sizeof(struct bucket));
+      new_bucket_el = ftls_alloc(sizeof(struct bucket));
       new_bucket_el->hash = hash;
-      new_bucket_el->key = (char *)driver_alloc(strlen(key) + 1);
+      new_bucket_el->key = ftls_alloc(strlen(key) + 1);
       strcpy(new_bucket_el->key, key);
       new_bucket_el->key_mtime = key_mtime;
       new_bucket_el->dh_mtime = dh_mtime;
@@ -204,8 +244,7 @@ static void hash_table_insert(char *key, time_t key_mtime, time_t dh_mtime,
 	 size = 1 << (level + 1);
 	 ht.split = split;
 	 ht.level = level;
-	 ht.buckets = (struct bucket **)
-	    driver_realloc(ht.buckets, sizeof(struct bucket *) * size);
+	 ht.buckets = ftls_realloc(ht.buckets, sizeof(struct bucket *) * size);
 	 for (i = 1 << level; i < size; i++)
 	    ht.buckets[i] = NULL;
       } else
@@ -245,7 +284,7 @@ static SSL_CTX *hash_table_lookup(char *key, time_t *key_mtime,
 
 static ErlDrvData tls_drv_start(ErlDrvPort port, char *buff)
 {
-   tls_data *d = (tls_data *)driver_alloc(sizeof(tls_data));
+   tls_data *d = ftls_alloc(sizeof(tls_data));
    d->port = port;
    d->bio_read = NULL;
    d->bio_write = NULL;
@@ -458,7 +497,7 @@ static void ssl_info_callback(const SSL *s, int where, int ret)
 	       rlen = errstrlen + error_string_length + 3;	\
 	    else						\
 	       rlen = errstrlen + 1;				\
-	    b = driver_alloc_binary(rlen);			\
+	    b = ftls_alloc_binary(rlen);			\
 	    b->orig_bytes[0] = 1;				\
 	    strncpy(b->orig_bytes + 1, errstr, errstrlen);	\
 	    if (error_code) {					\
@@ -541,7 +580,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 size_t dh_file_len = strlen(dh_file);
 	 char *ca_file = dh_file + dh_file_len + 1;
 	 size_t ca_file_len = strlen(ca_file);
-	 char *hash_key = (char *)driver_alloc(key_file_len +
+	 char *hash_key = ftls_alloc(key_file_len +
 					       ciphers_len +
 					       protocol_options_len +
 					       dh_file_len +
@@ -676,7 +715,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	       if (d->send_buffer2 == NULL) {
 		  d->send_buffer2_len = len;
 		  d->send_buffer2_size = len;
-		  d->send_buffer2 = driver_alloc(d->send_buffer2_size);
+		  d->send_buffer2 = ftls_alloc(d->send_buffer2_size);
 		  memcpy(d->send_buffer2, buf, len);
 	       } else {
 		  if (d->send_buffer2_size <
@@ -685,7 +724,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 			    d->send_buffer2_len + len) {
 			d->send_buffer2_size *= 2;
 		     }
-		     d->send_buffer2 = driver_realloc(d->send_buffer2,
+		     d->send_buffer2 = ftls_realloc(d->send_buffer2,
 						      d->send_buffer2_size);
 		  }
 		  memcpy(d->send_buffer2 + d->send_buffer2_len,
@@ -700,7 +739,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 		      res == SSL_ERROR_WANT_WRITE) {
 		     d->send_buffer_len = len;
 		     d->send_buffer_size = len;
-		     d->send_buffer = driver_alloc(d->send_buffer_size);
+		     d->send_buffer = ftls_alloc(d->send_buffer_size);
 		     memcpy(d->send_buffer, buf, len);
 		  } else {
 		     die_unless(0, "SSL_write failed");
@@ -712,7 +751,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
       case GET_ENCRYPTED_OUTPUT:
 	 die_unless(d->ssl, "SSL not initialized");
 	 size = BIO_ctrl_pending(d->bio_write) + 1;
-	 b = driver_alloc_binary(size);
+	 b = ftls_alloc_binary(size);
 	 b->orig_bytes[0] = 0;
 	 BIO_read(d->bio_write, b->orig_bytes + 1, size - 1);
 	 *rbuf = (char *)b;
@@ -754,7 +793,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    }
 	    size = BUF_SIZE + 1;
 	    rlen = 1;
-	    b = driver_alloc_binary(size);
+	    b = ftls_alloc_binary(size);
 	    b->orig_bytes[0] = retcode;
 
 	    res = 0;
@@ -769,7 +808,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	       rlen += res;
 	       if (size - rlen < BUF_SIZE) {
 		  size *= 2;
-		  b = driver_realloc_binary(b, size);
+		  b = ftls_realloc_binary(b, size);
 	       }
 	    }
 
@@ -777,7 +816,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	       char *error = "client renegotiations forbidden";
 	       int error_len = strlen(error);
 	       rlen = error_len + 1;
-	       b = driver_alloc_binary(rlen);
+	       b = ftls_alloc_binary(rlen);
 	       b->orig_bytes[0] = 1;
 	       strncpy(b->orig_bytes + 1, error, error_len);
 	       *rbuf = (char *)b;
@@ -795,11 +834,11 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	       }
 	       // TODO
 	    }
-	    b = driver_realloc_binary(b, rlen);
+	    b = ftls_realloc_binary(b, rlen);
 	    *rbuf = (char *)b;
 	    return rlen;
 	 } else {
-	    b = driver_alloc_binary(1);
+	    b = ftls_alloc_binary(1);
 	    b->orig_bytes[0] = 2;
 	    *rbuf = (char *)b;
 	    return 1;
@@ -810,7 +849,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 cert = SSL_get_peer_certificate(d->ssl);
 	 if (cert == NULL)
 	 {
-	    b = driver_alloc_binary(1);
+	    b = ftls_alloc_binary(1);
 	    b->orig_bytes[0] = 1;
 	    *rbuf = (char *)b;
 	    return 1;
@@ -820,7 +859,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    if (rlen >= 0)
 	    {
 	       rlen++;
-	       b = driver_alloc_binary(rlen);
+	       b = ftls_alloc_binary(rlen);
 	       b->orig_bytes[0] = 0;
 	       tmp_buf = (unsigned char *)&b->orig_bytes[1];
 	       i2d_X509(cert, &tmp_buf);
@@ -832,14 +871,14 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 }
 	 break;
       case GET_VERIFY_RESULT:
-	 b = driver_alloc_binary(1);
+	 b = ftls_alloc_binary(1);
 	 b->orig_bytes[0] = SSL_get_verify_result(d->ssl);
 	 *rbuf = (char *)b;
 	 return 1;
 	 break;
    }
 
-   b = driver_alloc_binary(1);
+   b = ftls_alloc_binary(1);
    b->orig_bytes[0] = 0;
    *rbuf = (char *)b;
    return 1;
