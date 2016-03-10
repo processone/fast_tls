@@ -855,10 +855,10 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    return 1;
 	 } else {
 	    unsigned char *tmp_buf;
-	    rlen = i2d_X509(cert, NULL);
-	    if (rlen >= 0)
+	    int encode_len = i2d_X509(cert, NULL);
+	    if (encode_len >= 0)
 	    {
-	       rlen++;
+	       rlen = encode_len + 1;
 	       b = ftls_alloc_binary(rlen);
 	       b->orig_bytes[0] = 0;
 	       tmp_buf = (unsigned char *)&b->orig_bytes[1];
