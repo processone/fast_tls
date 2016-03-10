@@ -490,9 +490,8 @@ static void ssl_info_callback(const SSL *s, int where, int ret)
 	    unsigned long error_code = ERR_get_error();		\
 	    char *error_string = error_code ?			\
 	       ERR_error_string(error_code, NULL) :		\
-	       NULL;						\
-	    int error_string_length = error_string ?		\
-	       strlen(error_string) : 0;			\
+	       "";						\
+	    int error_string_length = strlen(error_string);	\
 	    if (error_code)					\
 	       rlen = errstrlen + error_string_length + 3;	\
 	    else						\
