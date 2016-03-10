@@ -591,6 +591,10 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	    char *popts = po;
 	    char *strtok_buf;
 
+	    if (!po) {
+	       erl_exit(1, "fast_tls: strdup failed");
+	    }
+
 	    while ((po = strtok_r(po, delim, &strtok_buf)) != NULL) {
 	       set_option_flag(po, &options);
 	       po = NULL;
@@ -684,6 +688,9 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 
 	 d->bio_read = BIO_new(BIO_s_mem());
 	 d->bio_write = BIO_new(BIO_s_mem());
+
+	 die_unless(d->bio_read, "BIO_new failed");
+	 die_unless(d->bio_write, "BIO_new failed");
 
 	 SSL_set_bio(d->ssl, d->bio_read, d->bio_write);
 
