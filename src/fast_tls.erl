@@ -39,6 +39,10 @@
 -export([init/1, handle_call/3, handle_cast/2,
 	 handle_info/2, code_change/3, terminate/2]).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 -define(SET_CERTIFICATE_FILE_ACCEPT, 1).
 
 -define(SET_CERTIFICATE_FILE_CONNECT, 2).
@@ -421,3 +425,10 @@ load_driver() ->
                                    [erl_ddll:format_error(ErrorDesc)]),
             Err
     end.
+
+-ifdef(TEST).
+
+load_nif_test() ->
+    ?assertEqual(ok, load_driver()).
+
+-endif.
