@@ -46,7 +46,10 @@ ModCfg0 = fun(F, Cfg, [Key|Tail], Op, Default) ->
 ModCfg = fun(Cfg, Keys, Op, Default) -> ModCfg0(ModCfg0, Cfg, Keys, Op, Default) end.
 ModCfgS = fun(Cfg, Keys, Val) -> ModCfg0(ModCfg0, Cfg, Keys, fun(_V) -> Val end, "") end.
 
-Cfg0 = ModCfg(CONFIG, [port_env, "CFLAGS"], fun(V) -> V ++ " " ++ CfgCFlags end, "$CFLAGS"),
+
+ExitFlag = case list_to_float(erlang:system_info(version)) >= 7.3 of true -> "-DHAS_ERTS_EXIT"; _ -> "" end.
+
+Cfg0 = ModCfg(CONFIG, [port_env, "CFLAGS"], fun(V) -> V ++ " " ++ ExitFlag ++ " " ++ CfgCFlags end, "$CFLAGS"),
 Cfg00 = ModCfg(Cfg0, [port_env, "LDFLAGS"], fun(V) -> V ++ " " ++ CfgLDFlags end, "$LDFLAGS"),
 Cfg1 = case CfgWithGCov of
            "true" ->
