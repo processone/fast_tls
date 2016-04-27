@@ -1,3 +1,8 @@
+# Version 1.0.2
+
+* Add support for cafile option (Evgeny Khramtsov)
+* Better error checks (Michael Santos)
+
 # Version 1.0.1
 
 * Build improve, remove check on Erlang version for better build chain compliance (Mickaël Rémond)
