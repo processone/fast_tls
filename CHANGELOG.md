@@ -1,3 +1,7 @@
+# Version 1.0.3
+
+* Do not call internal erlang erl_exit function (Christophe Romain)
+
 # Version 1.0.2
 
 * Add support for cafile option (Evgeny Khramtsov)
