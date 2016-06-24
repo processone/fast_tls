@@ -1,3 +1,7 @@
+# Version 1.0.4
+
+* Better compliance with R17 and R18 (Paweł Chmielowski)
+
 # Version 1.0.3
 
 * Do not call internal erlang erl_exit function (Christophe Romain)
