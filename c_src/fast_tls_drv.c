@@ -20,10 +20,15 @@
 #include <erl_driver.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/opensslv.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdint.h>
 #include "options.h"
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define DH_set0_pqg(dh, dh_p, NULL, dh_g) (dh)->p = dh_p; (dh)->g = dh_g
+#endif
 
 #define BUF_SIZE 1024
 
@@ -103,7 +108,7 @@ ErlDrvBinary *ftls_realloc_binary(ErlDrvBinary *bin, ErlDrvSizeT size) {
 /**
  * Prepare the SSL options flag.
  **/
-static int set_option_flag(const char *opt, long *flag)
+static int set_option_flag(const char *opt, unsigned long *flag)
 {
     ssl_option_t *p;
     for (p = ssl_options; p->name; p++) {
@@ -450,12 +455,16 @@ static int setup_dh(SSL_CTX *ctx, char *dh_file)
 	 return 0;
       }
 
-      dh->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
-      dh->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
-      if (dh->p == NULL || dh->g == NULL) {
-	 DH_free(dh);
-	 return 0;
-      }
+       BIGNUM *dh_p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
+       BIGNUM *dh_g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
+       if (dh_p == NULL || dh_g == NULL) {
+           BN_free(dh_p);
+           BN_free(dh_g);
+           DH_free(dh);
+           return 0;
+       }
+
+       DH_set0_pqg(dh, dh_p, NULL, dh_g);
    }
 
    SSL_CTX_set_options(ctx, SSL_OP_SINGLE_DH_USE);
@@ -468,16 +477,13 @@ static int setup_dh(SSL_CTX *ctx, char *dh_file)
 
 static void ssl_info_callback(const SSL *s, int where, int ret)
 {
-   if (where == SSL_CB_ACCEPT_LOOP) {
-      int state = SSL_get_state(s);
-      if (state == SSL3_ST_SR_CLNT_HELLO_A ||
-	  state == SSL23_ST_SR_CLNT_HELLO_A) {
-	 tls_data *d = (tls_data *)SSL_get_ex_data(s, ssl_index);
-	 d->handshakes++;
-      }
+    tls_data *d = (tls_data *)SSL_get_ex_data(s, ssl_index);
+    if ((where & SSL_CB_HANDSHAKE_START) && d->handshakes) {
+       d->handshakes++;
+    } else if ((where & SSL_CB_HANDSHAKE_DONE) && !d->handshakes) {
+        d->handshakes++;
    }
 }
-
 
 #define SET_CERTIFICATE_FILE_ACCEPT 1
 #define SET_CERTIFICATE_FILE_CONNECT 2
@@ -591,7 +597,7 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 					       protocol_options_len +
 					       dh_file_len +
 					       ca_file_len + 1);
-	 long options = 0L;
+	 unsigned long options = 0L;
 
 	 if (protocol_options_len != 0) {
 	    char *po = strdup(protocol_options), delim[] = "|";
@@ -801,9 +807,9 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 
 	    if (len == 4)
 	    {
-	       unsigned char *b = (unsigned char *)buf;
+	       unsigned char *b2 = (unsigned char *)buf;
 	       req_size =
-		  (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+		  (b2[0] << 24) | (b2[1] << 16) | (b2[2] << 8) | b2[3];
 	    }
 	    size = BUF_SIZE + 1;
 	    rlen = 1;
@@ -925,15 +931,29 @@ ErlDrvEntry tls_driver_entry = {
   NULL,                 /* process_exit */
   NULL                  /* stop_select */
 };
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define our_alloc driver_alloc
+#define our_realloc driver_realloc
+#define our_free driver_free
+#else
+static void *our_alloc(size_t size, const char *file, int line) {
+    return driver_alloc(size);
+}
+static void * our_realloc(void *ptr, size_t size, const char *file, int line) {
+    return driver_realloc(ptr, size);
+}
+
+static void our_free(void *ptr, const char *file, int line) {
+    driver_free(ptr);
+}
+#endif
 
 DRIVER_INIT(fast_tls_drv) /* must match name in driver_entry */
 {
-   CRYPTO_set_mem_functions(driver_alloc, driver_realloc, driver_free);
+   CRYPTO_set_mem_functions(our_alloc, our_realloc, our_free);
    OpenSSL_add_ssl_algorithms();
    SSL_load_error_strings();
    init_hash_table();
    ssl_index = SSL_get_ex_new_index(0, "ssl index", NULL, NULL, NULL);
    return &tls_driver_entry;
 }
-
-

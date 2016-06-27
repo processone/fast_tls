@@ -33,6 +33,7 @@ AC_CHECK_LIB(crypto, SHA1_Init, [CRYPTO_LIB=yes], [], [])
 AC_CHECK_HEADER(openssl/ssl.h, [SSL_HEADER=yes], [], [])
 AC_CHECK_HEADER(openssl/err.h, [ERR_HEADER=yes], [], [])
 AC_CHECK_HEADER(openssl/sha.h, [SHA_HEADER=yes], [], [])
+AC_CHECK_HEADER(openssl/opensslv.h, [OPENSSLV_HEADER=yes], [], [])
 
 if test "x$SSL_LIB" = "x"; then
    AC_MSG_ERROR([OpenSSL 'ssl' library was not found])
@@ -52,6 +53,10 @@ fi
 
 if test "x$SHA_HEADER" = "x"; then
    AC_MSG_ERROR([OpenSSL header file "openssl/sha.h" was not found])
+fi
+
+if test "x$OPENSSLV_HEADER" = "x"; then
+   AC_MSG_ERROR([OpenSSL header file "openssl/opensslv.h" was not found])
 fi
 
 AC_ARG_ENABLE(gcov,

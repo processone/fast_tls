@@ -3838,6 +3838,12 @@ if test "x$ac_cv_header_openssl_sha_h" = xyes; then :
 fi
 
 
+ac_fn_c_check_header_mongrel "$LINENO" "openssl/opensslv.h" "ac_cv_header_openssl_opensslv_h" "$ac_includes_default"
+if test "x$ac_cv_header_openssl_opensslv_h" = xyes; then :
+  OPENSSLV_HEADER=yes
+fi
+
+
 
 if test "x$SSL_LIB" = "x"; then
    as_fn_error $? "OpenSSL 'ssl' library was not found" "$LINENO" 5
@@ -3857,6 +3863,10 @@ fi
 
 if test "x$SHA_HEADER" = "x"; then
    as_fn_error $? "OpenSSL header file \"openssl/sha.h\" was not found" "$LINENO" 5
+fi
+
+if test "x$OPENSSLV_HEADER" = "x"; then
+   as_fn_error $? "OpenSSL header file \"openssl/opensslv.h\" was not found" "$LINENO" 5
 fi
 
 # Check whether --enable-gcov was given.
