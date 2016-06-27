@@ -346,6 +346,9 @@ static void tls_drv_finish()
    }
 
    driver_free(ht.buckets);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    OPENSSL_cleanup();
+#endif
 }
 
 static int is_modified(char *file, time_t *known_mtime)
