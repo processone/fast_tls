@@ -1,3 +1,8 @@
+# Version 1.0.6
+
+* Fix compilation on rebar3 (Paweł Chmielowski)
+
+
 # Version 1.0.5
 
 * OpenSSL 1.1.0 compliance (Paweł Chmielowski)
