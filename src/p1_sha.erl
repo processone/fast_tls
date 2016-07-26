@@ -41,6 +41,9 @@ load_nif() ->
     case catch erlang:load_nif(SOPath, 0) of
         ok ->
             ok;
+        {error, {reload, _}} ->
+            %% Do not log warning when just attempting to reload nif.
+            ok;
         Err ->
             error_logger:warning_msg("unable to load sha NIF: ~p~n", [Err]),
             Err

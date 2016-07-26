@@ -1,3 +1,5 @@
+* Do not log warning on sha1 nif reload attempt (Mickaël Rémond)
+
 # Version 1.0.6
 
 * Fix compilation on rebar3 (Paweł Chmielowski)
