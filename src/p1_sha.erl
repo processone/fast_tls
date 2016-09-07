@@ -25,6 +25,8 @@
 
 -author('alexey@process-one.net').
 
+-compile(no_native).
+
 -export([load_nif/0,
          sha/1, sha1/1, sha224/1, sha256/1,
          sha384/1, sha512/1, to_hexlist/1]).
