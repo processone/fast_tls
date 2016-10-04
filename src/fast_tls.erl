@@ -32,7 +32,8 @@
 -export([start_link/0, tcp_to_tls/2,
 	 tls_to_tcp/1, send/2, recv/2, recv/3, recv_data/2,
 	 setopts/2, sockname/1, peername/1,
-	 controlling_process/2, close/1, get_peer_certificate/1,
+	 controlling_process/2, close/1,
+	 get_peer_certificate/1, get_peer_certificate/2,
 	 get_verify_result/1, get_cert_verify_string/2, test/0]).
 
 %% Internal exports, call-back functions.
@@ -272,12 +273,15 @@ close(#tlssock{tcpsock = TCPSocket, tlsport = Port}) ->
     gen_tcp:close(TCPSocket), port_close(Port).
 
 -spec get_peer_certificate(tls_socket()) -> error | {ok, cert()}.
+get_peer_certificate(TLSSock) ->
+    get_peer_certificate(TLSSock, plain).
 
-get_peer_certificate(#tlssock{tlsport = Port}) ->
+-spec get_peer_certificate(tls_socket(), otp|plain) -> error | {ok, cert()}.
+get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
     case catch port_control(Port, ?GET_PEER_CERTIFICATE, []) of
       {'EXIT', {badarg, _}} -> error;
       <<0, BCert/binary>> ->
-	  case catch public_key:pkix_decode_cert(BCert, plain)
+	  case catch public_key:pkix_decode_cert(BCert, Type)
 	      of
 	    {ok, Cert} -> {ok, Cert};
 	    {'Certificate', _, _, _} = Cert -> {ok, Cert};
