@@ -1,3 +1,9 @@
+# Version 1.0.8
+
+* Use p1_utils 1.0.6 (Christophe Romain)
+* Make it possible to decode certificate to OTP format (Evgeniy Khramtsov)
+* Make sure p1_sha isn't compiled to native code (Holger Weiss)
+
 # Version 1.0.7
 
 * Use p1_utils 1.0.5 (Mickaël Rémond)
