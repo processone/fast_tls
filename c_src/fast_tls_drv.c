@@ -27,7 +27,7 @@
 #include "options.h"
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
-#define DH_set0_pqg(A, B, C, D) do { (A)->p = B; (A)->g = D } while (0)
+#define DH_set0_pqg(A, B, C, D) do { (A)->p = B; (A)->g = D; } while (0)
 #endif
 
 #define BUF_SIZE 1024
