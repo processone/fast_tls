@@ -26,8 +26,8 @@
 #include <stdint.h>
 #include "options.h"
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L && !defined LIBRESSL_VERSION_NUMBER
-#define DH_set0_pqg(dh, dh_p, NULL, dh_g) (dh)->p = dh_p; (dh)->g = dh_g
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
+#define DH_set0_pqg(A, B, C, D) do { (A)->p = B; (A)->g = D } while (0)
 #endif
 
 #define BUF_SIZE 1024
@@ -934,7 +934,7 @@ ErlDrvEntry tls_driver_entry = {
   NULL,                 /* process_exit */
   NULL                  /* stop_select */
 };
-#if OPENSSL_VERSION_NUMBER < 0x10100000L && !defined LIBRESSL_VERSION_NUMBER
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
 #define our_alloc driver_alloc
 #define our_realloc driver_realloc
 #define our_free driver_free
