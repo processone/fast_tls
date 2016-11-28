@@ -39,16 +39,18 @@
 %%% API functions
 %%%===================================================================
 load_nif() ->
-    SOPath = p1_nif_utils:get_so_path(?MODULE, [fast_tls], "p1_sha"),
+    load_nif(p1_nif_utils:get_so_path(?MODULE, [fast_tls], "p1_sha")).
+
+load_nif(SOPath) ->
     case catch erlang:load_nif(SOPath, 0) of
-        ok ->
-            ok;
-        {error, {reload, _}} ->
-            %% Do not log warning when just attempting to reload nif.
-            ok;
-        Err ->
-            error_logger:warning_msg("unable to load sha NIF: ~p~n", [Err]),
-            Err
+	ok ->
+	    ok;
+	{error, {reload, _}} ->
+	    %% Do not log warning when just attempting to reload nif.
+	    ok;
+	Err ->
+	    error_logger:warning_msg("unable to load sha NIF: ~p~n", [Err]),
+	    Err
     end.
  
 -spec to_hexlist(iodata()) -> binary().
@@ -86,7 +88,7 @@ sha512(_Text) ->
 -ifdef(TEST).
 
 load_nif_test() ->
-    ?assertEqual(ok, load_nif()).
+    ?assertEqual(ok, load_nif(p1_nif_utils:get_so_path(?MODULE, [], "p1_sha"))).
 
 sha1_test() ->
     ?assertEqual(

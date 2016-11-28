@@ -418,6 +418,9 @@ integer_to_binary(I) ->
 
 load_driver() ->
     SOPath = p1_nif_utils:get_so_path(fast_tls, [fast_tls], "fast_tls_drv"),
+    load_driver(SOPath).
+
+load_driver(SOPath) ->
     Dir = filename:dirname(SOPath),
     case erl_ddll:load_driver(Dir, "fast_tls_drv") of
         ok ->
@@ -433,6 +436,7 @@ load_driver() ->
 -ifdef(TEST).
 
 load_nif_test() ->
-    ?assertEqual(ok, load_driver()).
+    SOPath = p1_nif_utils:get_so_path(fast_tls, [], "fast_tls_drv"),
+    ?assertEqual(ok, load_driver(SOPath)).
 
 -endif.
