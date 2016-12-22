@@ -1,3 +1,8 @@
+# Version 1.0.9
+
+* Fix problem with compilation agains libressl
+* Make tests use localy build c library instead of system one
+
 # Version 1.0.8
 
 * Use p1_utils 1.0.6 (Christophe Romain)
