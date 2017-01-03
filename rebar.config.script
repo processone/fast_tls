@@ -92,6 +92,20 @@ Rebar3DepsFilter = fun(DepsList) ->
 				     end, DepsList)
 		   end,
 
+GlobalDepsFilter = fun(Deps) ->
+			   DepNames = lists:map(fun({DepName, _, _}) -> DepName;
+						   ({DepName, _}) -> DepName
+						   end, Deps),
+			   lists:filtermap(fun(Dep) ->
+						 case code:lib_dir(Dep) of
+						     {error, _} ->
+							 {true,"Unable to locate dep '"++atom_to_list(Dep)++"' in system deps."};
+						     _ ->
+							 false
+						 end
+					 end, DepNames)
+		   end,
+
 Rules = [
 	 {[port_env, "CFLAGS"], SysVersion >= [7, 3],
 	  AppendStr("-DHAS_ERTS_EXIT"), "$CFLAGS"},
@@ -119,7 +133,9 @@ Rules = [
 	  AppendList([{coveralls, ".*", {git, "https://github.com/markusn/coveralls-erl.git", "master"}}]), []},
 	 {[post_hooks], os:getenv("TRAVIS") == "true",
 	  AppendList([{eunit, "echo '\n%%! -pa .eunit/ deps/coveralls/ebin\nmain(_)->{ok,F}=file:open(\"erlang.json\",[write]),io:fwrite(F,\"~s\",[coveralls:convert_file(\".eunit/cover.coverdata\", \""++JobId++"\", \"travis-ci\")]).' > getcover.erl"},
-		      {eunit, "escript ./getcover.erl"}]), []}
+		      {eunit, "escript ./getcover.erl"}]), []},
+	 {[deps], os:getenv("USE_GLOBAL_DEPS") /= false,
+	  GlobalDepsFilter, []}
 	],
 
 
