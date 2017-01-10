@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.53)
-AC_PACKAGE_VERSION(1.0.0)
-AC_INIT(tls, 1.0.0, [], [])
+AC_PACKAGE_VERSION(1.0.10)
+AC_INIT(tls, 1.0.10, [], [])
 
 # Checks for programs.
 AC_PROG_CC

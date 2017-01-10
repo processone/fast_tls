@@ -1,3 +1,7 @@
+# Version 1.0.10
+
+* Add ability to use system installed deps instead fetching them from git (Paweł Chmielowski)
+
 # Version 1.0.9
 
 * Fix problem with compilation agains libressl
