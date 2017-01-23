@@ -132,7 +132,7 @@ Rules = [
 	 {[deps], os:getenv("TRAVIS") == "true",
 	  AppendList([{coveralls, ".*", {git, "https://github.com/markusn/coveralls-erl.git", "master"}}]), []},
 	 {[post_hooks], os:getenv("TRAVIS") == "true",
-	  AppendList([{eunit, "echo '\n%%! -pa .eunit/ deps/coveralls/ebin\nmain(_)->{ok,F}=file:open(\"erlang.json\",[write]),io:fwrite(F,\"~s\",[coveralls:convert_file(\".eunit/cover.coverdata\", \""++JobId++"\", \"travis-ci\")]).' > getcover.erl"},
+	  AppendList([{eunit, "echo '\n%%! -pa .eunit/ deps/coveralls/ebin\nmain(_)->{ok,F}=file:open(\"erlang.json\",[write]),io:fwrite(F,\"~s\",[coveralls:convert_file(\".eunit/cover.coverdata\", \""++JobId++"\", \"travis-ci\",\"\")]).' > getcover.erl"},
 		      {eunit, "escript ./getcover.erl"}]), []},
 	 {[deps], os:getenv("USE_GLOBAL_DEPS") /= false,
 	  GlobalDepsFilter, []}
