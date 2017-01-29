@@ -140,7 +140,7 @@ Rules = [
 
 Config = FilterConfig(FilterConfig, CONFIG, Rules),
 
-io:format("Rules:~n~p~n~nCONFIG:~n~p~n~nConfig:~n~p~n", [Rules, CONFIG, Config]),
+%io:format("Rules:~n~p~n~nCONFIG:~n~p~n~nConfig:~n~p~n", [Rules, CONFIG, Config]),
 
 Config.
 
