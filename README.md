@@ -23,14 +23,14 @@ You can trigger build with:
 
 ### OSX build example
 
-On OSX, OpenSSL library is usually too old, so you need to install a
-newer OpenSSL version.
+On macOS the system copy of OpenSSL is usually too old, so you need to
+install a newer OpenSSL version.
 
-You can install OpenSSL and with Homebrew:
+You can install OpenSSL with Homebrew:
 
     brew install openssl
 
-You can then export environment variable to use LibYaml as installed
+You can then export environment variables to use OpenSSL as installed
 by Homebrew, before issuing compilation commands:
 
     export LDFLAGS="-L/usr/local/opt/openssl/lib"
