@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/processone/fast_tls.svg?branch=master)](https://travis-ci.org/processone/fast_tls) [![Coverage Status](https://coveralls.io/repos/processone/fast_tls/badge.svg?branch=master&service=github)](https://coveralls.io/github/processone/fast_tls?branch=master) [![Hex version](https://img.shields.io/hexpm/v/fast_tls.svg "Hex version")](https://hex.pm/packages/fast_tls)
 
-Fast TSL is a native TLS / SSL driver for Erlang / Elixir. It is based
+Fast TLS is a native TLS / SSL driver for Erlang / Elixir. It is based
 on [OpenSSL](https://www.openssl.org), a proven and efficient TLS
 implementation.
 
@@ -13,7 +13,7 @@ It is designed for efficiency, speed and compliance.
 ### Dependencies
 
 Fast TLS depends on OpenSSL v1.0+. You need OpenSSL development
-headers to build it.
+headers to build it. You can check your current OpenSSL version with `openssl version`.
 
 ### Generic build
 
