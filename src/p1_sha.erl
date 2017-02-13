@@ -27,9 +27,12 @@
 
 -compile(no_native).
 
--export([load_nif/0,
-         sha/1, sha1/1, sha224/1, sha256/1,
-         sha384/1, sha512/1, to_hexlist/1]).
+-export([load_nif/0, sha/1, to_hexlist/1]).
+
+%% The following functions are deprecated.
+-export([sha1/1, sha224/1, sha256/1, sha384/1, sha512/1]).
+
+-deprecated([{sha1,1}, {sha224,1}, {sha256,1}, {sha384,1}, {sha512,1}]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -65,22 +68,22 @@ to_hexlist(_Text) ->
     erlang:nif_error(nif_not_loaded).
 
 sha(Text) ->
-    to_hexlist(sha1(Text)).
+    to_hexlist(crypto:hash(sha, Text)).
 
-sha1(_Text) ->
-    erlang:nif_error(nif_not_loaded).
+sha1(Text) ->
+    crypto:hash(sha, Text).
 
-sha224(_Text) ->
-    erlang:nif_error(nif_not_loaded).
+sha224(Text) ->
+    crypto:hash(sha224, Text).
 
-sha256(_Text) ->
-    erlang:nif_error(nif_not_loaded).
+sha256(Text) ->
+    crypto:hash(sha256, Text).
 
-sha384(_Text) ->
-    erlang:nif_error(nif_not_loaded).
+sha384(Text) ->
+    crypto:hash(sha384, Text).
 
-sha512(_Text) ->
-    erlang:nif_error(nif_not_loaded).
+sha512(Text) ->
+    crypto:hash(sha512, Text).
 
 %%%===================================================================
 %%% Unit tests
