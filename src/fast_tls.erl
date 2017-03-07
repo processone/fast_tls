@@ -43,6 +43,7 @@
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
+-include_lib("public_key/include/public_key.hrl").
 
 -define(SET_CERTIFICATE_FILE_ACCEPT, 1).
 
@@ -281,12 +282,11 @@ get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
     case catch port_control(Port, ?GET_PEER_CERTIFICATE, []) of
       {'EXIT', {badarg, _}} -> error;
       <<0, BCert/binary>> ->
-	  case catch public_key:pkix_decode_cert(BCert, Type)
-	      of
-	    {ok, Cert} -> {ok, Cert};
-	    {'Certificate', _, _, _} = Cert -> {ok, Cert};
-	    _ -> error
-	  end;
+	    try public_key:pkix_decode_cert(BCert, Type) of
+		Cert -> {ok, Cert}
+	    catch _:_ ->
+		    error
+	    end;
       <<1>> -> error
     end.
 
@@ -347,9 +347,12 @@ get_cert_verify_string(CertVerifyRes, Cert) ->
 	  end
     end.
 
-cert_is_self_signed(Cert) ->
+cert_is_self_signed(#'Certificate'{} = Cert) ->
     BCert = public_key:pkix_encode('Certificate', Cert, plain),
-    public_key:pkix_is_self_signed(BCert).
+    cert_is_self_signed(BCert);
+cert_is_self_signed(Cert) ->
+    public_key:pkix_is_self_signed(Cert).
+
 
 cert_verify_code(0) -> <<"ok">>;
 cert_verify_code(2) ->
