@@ -1,3 +1,13 @@
+# Version 1.0.11
+
+* coveralls:convert_file is not 4 arg function (Paweł Chmielowski)
+* Resolve vars.config relative to SCRIPT (Paweł Chmielowski)
+* Comment debug line (Paweł Chmielowski)
+* Fix a couple typos in the README's macOS/OS X section (Alex Jordan)
+* Small typo fix on readme (costpermille)
+* Deprecate hash functions in favor of crypto:hash/2 (Peter Lemenkov)
+* Fix certificate decoding to OTP format (Evgeniy Khramtsov)
+
 # Version 1.0.10
 
 * Add ability to use system installed deps instead fetching them from git (Paweł Chmielowski)
