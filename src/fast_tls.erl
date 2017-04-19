@@ -114,7 +114,6 @@ terminate(_Reason, _State) ->
 tcp_to_tls(TCPSocket, Options) ->
     case lists:keysearch(certfile, 1, Options) of
       {value, {certfile, CertFile}} ->
-	  load_driver(),
 	  Port = open_port({spawn, "fast_tls_drv"}, [binary]),
 	  Flags1 = case lists:member(verify_none, Options) of
                        true -> ?VERIFY_NONE;
