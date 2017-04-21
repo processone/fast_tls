@@ -184,7 +184,7 @@ static void init_hash_table()
    ht.level = MIN_LEVEL;
    for (i = 0; i < size; i++)
       ht.buckets[i] = NULL;
-   
+
 }
 
 static void hash_table_insert(char *key, time_t key_mtime, time_t dh_mtime,
@@ -711,13 +711,13 @@ static ErlDrvSSizeT tls_drv_control(ErlDrvData handle,
 	 SSL_set_bio(d->ssl, d->bio_read, d->bio_write);
 
 	 if (command == SET_CERTIFICATE_FILE_ACCEPT) {
-	    options |= (SSL_OP_NO_TICKET|SSL_OP_ALL|SSL_OP_NO_SSLv2);
+	    options |= (SSL_OP_NO_TICKET|SSL_OP_ALL|SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
 
 	    SSL_set_options(d->ssl, options);
 
 	    SSL_set_accept_state(d->ssl);
 	 } else {
-	    options |= (SSL_OP_NO_TICKET|SSL_OP_NO_SSLv2);
+	    options |= (SSL_OP_NO_TICKET|SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
 
 	    SSL_set_options(d->ssl, options);
 
