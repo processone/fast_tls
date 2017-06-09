@@ -1,3 +1,7 @@
+# Version 1.0.12
+
+* depends on p1_utils-1.0.9
+
 # Version 1.0.11
 
 * coveralls:convert_file is not 4 arg function (Paweł Chmielowski)
