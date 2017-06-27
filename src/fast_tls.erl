@@ -29,12 +29,17 @@
 
 -behaviour(gen_server).
 
+-export([open_nif/6, get_decrypted_input_nif/2,
+	 set_encrypted_input_nif/2, get_encrypted_output_nif/1,
+	 set_decrypted_output_nif/2, get_peer_certificate_nif/1,
+	 get_verify_result_nif/1, invalidate_nif/1]).
+
 -export([start_link/0, tcp_to_tls/2,
 	 tls_to_tcp/1, send/2, recv/2, recv/3, recv_data/2,
 	 setopts/2, sockname/1, peername/1,
 	 controlling_process/2, close/1,
 	 get_peer_certificate/1, get_peer_certificate/2,
-	 get_verify_result/1, get_cert_verify_string/2, test/0]).
+	 get_verify_result/1, get_cert_verify_string/2]).
 
 %% Internal exports, call-back functions.
 -export([init/1, handle_call/3, handle_cast/2,
@@ -81,12 +86,36 @@ start_link() ->
 			  []).
 
 init([]) ->
-    case load_driver() of
+    case load_nif() of
         ok ->
             {ok, []};
         {error, Why} ->
             {stop, Why}
     end.
+
+open_nif(_Flags, _CertFile, _Ciphers, _ProtocolOpts, _DHFile, _CAFile) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+get_decrypted_input_nif(_Port, _Length) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+set_encrypted_input_nif(_Port, _Packet) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+get_encrypted_output_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+set_decrypted_output_nif(_Port, _Packet) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+get_peer_certificate_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+get_verify_result_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+invalidate_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 %%% --------------------------------------------------------
 %%% The call-back functions.
@@ -113,65 +142,61 @@ terminate(_Reason, _State) ->
 
 tcp_to_tls(TCPSocket, Options) ->
     case lists:keysearch(certfile, 1, Options) of
-      {value, {certfile, CertFile}} ->
-	  Port = open_port({spawn, "fast_tls_drv"}, [binary]),
-	  Flags1 = case lists:member(verify_none, Options) of
-                       true -> ?VERIFY_NONE;
-                       false -> 0
-                   end,
-          Flags2 = case lists:member(compression_none, Options) of
-                       true -> ?COMPRESSION_NONE;
-                       false -> 0
-                   end,
-          Flags = Flags1 bor Flags2,
-	  Command = case lists:member(connect, Options) of
-		      true -> ?SET_CERTIFICATE_FILE_CONNECT;
-		      false -> ?SET_CERTIFICATE_FILE_ACCEPT
-		    end,
-          Ciphers =
-                case lists:keysearch(ciphers, 1, Options) of
-                    {value, {ciphers, C}} ->
-                        iolist_to_binary(C);
-                    false ->
-                        <<>>
-                end,
-          ProtocolOpts = case lists:keysearch(protocol_options, 1, Options) of
-                                 {value, {protocol_options, P}} ->
-                                     iolist_to_binary(P);
-                                 false ->
-                                     <<>>
-                             end,
-          DHFile = case lists:keysearch(dhfile, 1, Options) of
-                       {value, {dhfile, D}} ->
-                           iolist_to_binary(D);
-                       false ->
-                           <<>>
-                   end,
-	  CAFile = case lists:keysearch(cafile, 1, Options) of
-		       {value, {cafile, CF}} ->
-			   iolist_to_binary(CF);
-		       false ->
-			   <<>>
-		   end,
-          CertFile1 = iolist_to_binary(CertFile),
-	  case catch port_control(Port, Command bor Flags,
-				  <<CertFile1/binary, 0, Ciphers/binary,
-				    0, ProtocolOpts/binary, 0, DHFile/binary,
-				    0, CAFile/binary, 0>>)
-	      of
-	    {'EXIT', {badarg, _}} -> {error, einval};
-	    <<0>> ->
-		{ok, #tlssock{tcpsock = TCPSocket, tlsport = Port}};
-	    <<1, Error/binary>> -> {error, (Error)}
-	  end;
-      false -> {error, no_certfile}
+	{value, {certfile, CertFile}} ->
+	    Flags1 = case lists:member(verify_none, Options) of
+			 true -> ?VERIFY_NONE;
+			 false -> 0
+		     end,
+	    Flags2 = case lists:member(compression_none, Options) of
+			 true -> ?COMPRESSION_NONE;
+			 false -> 0
+		     end,
+	    Flags = Flags1 bor Flags2,
+	    Command = case lists:member(connect, Options) of
+			  true -> ?SET_CERTIFICATE_FILE_CONNECT;
+			  false -> ?SET_CERTIFICATE_FILE_ACCEPT
+		      end,
+	    Ciphers =
+	    case lists:keysearch(ciphers, 1, Options) of
+		{value, {ciphers, C}} ->
+		    iolist_to_binary(C);
+		false ->
+		    <<>>
+	    end,
+	    ProtocolOpts = case lists:keysearch(protocol_options, 1, Options) of
+			       {value, {protocol_options, P}} ->
+				   iolist_to_binary(P);
+			       false ->
+				   <<>>
+			   end,
+	    DHFile = case lists:keysearch(dhfile, 1, Options) of
+			 {value, {dhfile, D}} ->
+			     iolist_to_binary(D);
+			 false ->
+			     <<>>
+		     end,
+	    CAFile = case lists:keysearch(cafile, 1, Options) of
+			 {value, {cafile, CA}} ->
+			     iolist_to_binary(CA);
+			 false ->
+			     <<>>
+		     end,
+	    case open_nif(Command bor Flags, CertFile, Ciphers, ProtocolOpts,
+			  DHFile, CAFile) of
+		{ok, Port} ->
+		    {ok, #tlssock{tcpsock = TCPSocket, tlsport = Port}};
+		Err = {error, _} ->
+		    Err
+	    end;
+	false -> {error, no_certfile}
     end.
 
 -spec tls_to_tcp(tls_socket()) -> inet:socket().
 
 tls_to_tcp(#tlssock{tcpsock = TCPSocket,
 		    tlsport = Port}) ->
-    port_close(Port), TCPSocket.
+    invalidate_nif(Port),
+    TCPSocket.
 
 recv(Socket, Length) -> recv(Socket, Length, infinity).
 
@@ -211,27 +236,31 @@ recv_data(TLSSock, Packet, Length) ->
 recv_data1(#tlssock{tcpsock = TCPSocket,
 		    tlsport = Port},
 	   Packet, Length) ->
-    case catch port_control(Port, ?SET_ENCRYPTED_INPUT, Packet) of
-      {'EXIT', {badarg, _}} -> {error, einval};
-      <<0>> ->
-	  case catch port_control(Port, ?GET_DECRYPTED_INPUT,
-				  <<Length:32>>)
-	      of
-	    {'EXIT', {badarg, _}} -> {error, einval};
-	    <<0, In/binary>> -> {ok, In};
-	    <<2, In/binary>> ->
-		case catch port_control(Port, ?GET_ENCRYPTED_OUTPUT, []) of
-		  {'EXIT', {badarg, _}} -> {error, einval};
-		  <<0, Out/binary>> ->
-		      case gen_tcp:send(TCPSocket, Out) of
-			ok -> {ok, In};
-			Error -> Error
-		      end;
-		  <<1, Error/binary>> -> {error, (Error)}
-		end;
-	    <<1, Error/binary>> -> {error, (Error)}
-	  end;
-      <<1, Error/binary>> -> {error, (Error)}
+    case catch set_encrypted_input_nif(Port, Packet) of
+	{'EXIT', {badarg, _}} ->
+	    {error, einval};
+	ok ->
+	    case catch get_decrypted_input_nif(Port, Length) of
+		{'EXIT', {badarg, _}} ->
+		    {error, einval};
+		{ok, In} -> {ok, In};
+		{send, In} ->
+		    case catch get_encrypted_output_nif(Port) of
+			{'EXIT', {badarg, _}} ->
+			    {error, einval};
+			{ok, Out} ->
+			    case gen_tcp:send(TCPSocket, Out) of
+				ok -> {ok, In};
+				Error -> Error
+			    end;
+			{error, _} = Err ->
+			    Err
+		    end;
+		{error, _} = Err ->
+		    Err
+	    end;
+	{error, _} = Err ->
+	    Err
     end.
 
 -spec send(tls_socket(), binary()) -> ok | {error, inet:posix() |
@@ -239,16 +268,20 @@ recv_data1(#tlssock{tcpsock = TCPSocket,
 
 send(#tlssock{tcpsock = TCPSocket, tlsport = Port},
      Packet) ->
-    case catch port_control(Port, ?SET_DECRYPTED_OUTPUT, Packet)
-	of
-      {'EXIT', {badarg, _}} -> {error, einval};
-      <<0>> ->
-	  case catch port_control(Port, ?GET_ENCRYPTED_OUTPUT, []) of
-	    {'EXIT', {badarg, _}} -> {error, einval};
-	    <<0, Out/binary>> -> gen_tcp:send(TCPSocket, Out);
-	    <<1, Error/binary>> -> {error, (Error)}
-	  end;
-      <<1, Error/binary>> -> {error, Error}
+    case catch set_decrypted_output_nif(Port, Packet) of
+	{'EXIT', {badarg, _}} ->
+	    {error, einval};
+	ok ->
+	    case catch get_encrypted_output_nif(Port) of
+		{'EXIT', {badarg, _}} ->
+		    {error, einval};
+		{ok, Out} ->
+		    gen_tcp:send(TCPSocket, Out);
+		{error, _} = Err ->
+		    Err
+	    end;
+	{error, _} = Err ->
+	    Err
     end.
 
 -spec setopts(tls_socket(), list()) -> ok | {error, inet:posix()}.
@@ -270,7 +303,8 @@ controlling_process(#tlssock{tcpsock = TCPSocket},
     gen_tcp:controlling_process(TCPSocket, Pid).
 
 close(#tlssock{tcpsock = TCPSocket, tlsport = Port}) ->
-    gen_tcp:close(TCPSocket), port_close(Port).
+    invalidate_nif(Port),
+    gen_tcp:close(TCPSocket).
 
 -spec get_peer_certificate(tls_socket()) -> error | {ok, cert()}.
 get_peer_certificate(TLSSock) ->
@@ -278,9 +312,10 @@ get_peer_certificate(TLSSock) ->
 
 -spec get_peer_certificate(tls_socket(), otp|plain) -> error | {ok, cert()}.
 get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
-    case catch port_control(Port, ?GET_PEER_CERTIFICATE, []) of
-      {'EXIT', {badarg, _}} -> error;
-      <<0, BCert/binary>> ->
+    case catch get_peer_certificate_nif(Port) of
+	{'EXIT', {badarg, _}} ->
+	    error;
+	{ok, BCert} ->
 	    try public_key:pkix_decode_cert(BCert, Type) of
 		Cert -> {ok, Cert}
 	    catch _:_ ->
@@ -292,47 +327,8 @@ get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
 -spec get_verify_result(tls_socket()) -> byte().
 
 get_verify_result(#tlssock{tlsport = Port}) ->
-    <<Res>> = port_control(Port, ?GET_VERIFY_RESULT, []),
+    {ok, Res} = get_verify_result_nif(Port),
     Res.
-
-test() ->
-    load_driver(),
-    Port = open_port({spawn, "fast_tls_drv"}, [binary]),
-    ?PRINT("open_port: ~p~n", [Port]),
-    PCRes = port_control(Port, ?SET_CERTIFICATE_FILE_ACCEPT,
-			 <<"./ssl.pem", 0>>),
-    ?PRINT("port_control: ~p~n", [PCRes]),
-    {ok, ListenSocket} = gen_tcp:listen(1234,
-					[binary, {packet, 0}, {active, true},
-					 {reuseaddr, true}, {nodelay, true}]),
-    ?PRINT("listen: ~p~n", [ListenSocket]),
-    {ok, Socket} = gen_tcp:accept(ListenSocket),
-    ?PRINT("accept: ~p~n", [Socket]),
-    loop(Port, Socket).
-
-loop(Port, Socket) ->
-    receive
-      {tcp, Socket, Data} ->
-	  Res = port_control(Port, ?SET_ENCRYPTED_INPUT, Data),
-	  ?PRINT("SET_ENCRYPTED_INPUT: ~p~n", [Res]),
-	  DIRes = port_control(Port, ?GET_DECRYPTED_INPUT, Data),
-	  ?PRINT("GET_DECRYPTED_INPUT: ~p~n", [DIRes]),
-	  case DIRes of
-	    <<0, In/binary>> -> ?PRINT("input: ~s~n", [(In)]);
-	    <<1, DIError/binary>> ->
-		?PRINT("GET_DECRYPTED_INPUT error: ~p~n", [(DIError)])
-	  end,
-	  EORes = port_control(Port, ?GET_ENCRYPTED_OUTPUT, Data),
-	  ?PRINT("GET_ENCRYPTED_OUTPUT: ~p~n", [EORes]),
-	  case EORes of
-	    <<0, Out/binary>> -> gen_tcp:send(Socket, Out);
-	    <<1, EOError/binary>> ->
-		?PRINT("GET_ENCRYPTED_OUTPUT error: ~p~n", [(EOError)])
-	  end,
-	  loop(Port, Socket);
-      Msg ->
-	  ?PRINT("receive: ~p~n", [Msg]), loop(Port, Socket)
-    end.
 
 -spec get_cert_verify_string(number(), cert()) -> binary().
 
@@ -418,19 +414,18 @@ cert_verify_code(X) ->
 integer_to_binary(I) ->
     list_to_binary(integer_to_list(I)).
 
-load_driver() ->
-    SOPath = p1_nif_utils:get_so_path(fast_tls, [fast_tls], "fast_tls_drv"),
-    load_driver(SOPath).
+load_nif() ->
+    SOPath = p1_nif_utils:get_so_path(fast_tls, [fast_tls], "fast_tls"),
+    load_nif(SOPath).
 
-load_driver(SOPath) ->
-    Dir = filename:dirname(SOPath),
-    case erl_ddll:load_driver(Dir, "fast_tls_drv") of
+load_nif(SOPath) ->
+    case erlang:load_nif(SOPath, 0) of
         ok ->
             ok;
         {error, already_loaded} ->
             ok;
         {error, ErrorDesc} = Err ->
-            error_logger:error_msg("failed to load TLS driver: ~s~n",
+            error_logger:error_msg("failed to load TLS NIF: ~s~n",
                                    [erl_ddll:format_error(ErrorDesc)]),
             Err
     end.
@@ -438,7 +433,61 @@ load_driver(SOPath) ->
 -ifdef(TEST).
 
 load_nif_test() ->
-    SOPath = p1_nif_utils:get_so_path(fast_tls, [], "fast_tls_drv"),
-    ?assertEqual(ok, load_driver(SOPath)).
+    SOPath = p1_nif_utils:get_so_path(fast_tls, [], "fast_tls"),
+    ?assertEqual(ok, load_nif(SOPath)).
+
+transmision_test() ->
+    {LPid, Port} = setup_listener(),
+    setup_sender(Port),
+    LPid ! {stop, self()},
+    receive
+	{received, Msg} ->
+	    ?assertEqual(Msg, <<"abcdefghi">>)
+    end.
+
+setup_listener() ->
+    {ok, ListenSocket} = gen_tcp:listen(50123,
+					[binary, {packet, 0}, {active, false},
+					 {reuseaddr, true}, {nodelay, true}]),
+    Pid = spawn(fun() ->
+	{ok, Socket} = gen_tcp:accept(ListenSocket),
+	{ok, TLSSock} = tcp_to_tls(Socket, [{certfile, <<"../tests/cert.pem">>}]),
+	listener_loop(TLSSock, <<>>)
+		end),
+    {ok, Port} = inet:port(ListenSocket),
+    {Pid, Port}.
+
+listener_loop(TLSSock, Msg) ->
+    case recv(TLSSock, 1, 1000) of
+	{error, timeout} ->
+	    listener_loop(TLSSock, Msg);
+	{error, _} ->
+	    receive
+		{stop, Pid} ->
+		    Pid ! {received, Msg}
+	    end;
+	{ok, Data} ->
+	    listener_loop(TLSSock, <<Msg/binary, Data/binary>>)
+    end.
+
+setup_sender(Port) ->
+    {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, Port, [
+	binary, {packet, 0}, {active, false},
+	{reuseaddr, true}, {nodelay, true}]),
+    spawn(fun() ->
+	{ok, TLSSock} = tcp_to_tls(Socket, [connect, {certfile, <<"../tests/cert.pem">>}]),
+	sender_loop(TLSSock)
+	  end),
+    ok.
+
+sender_loop(TLSSock) ->
+    recv(TLSSock, 0, 1000),
+    ok = send(TLSSock, <<"abc">>),
+    recv(TLSSock, 0, 1000),
+    ok = send(TLSSock, <<"def">>),
+    recv(TLSSock, 0, 1000),
+    ok = send(TLSSock, <<"ghi">>),
+    recv(TLSSock, 0, 1000),
+    close(TLSSock).
 
 -endif.
