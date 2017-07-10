@@ -75,7 +75,7 @@ static void our_free(void *ptr, const char *file, int line) {
 }
 #endif
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L && OPENSSL_VERSION_NUMBER >= 0x10002000
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L || OPENSSL_VERSION_NUMBER < 0x10002000
 #undef SSL_CTX_set_ecdh_auto
 #define SSL_CTX_set_ecdh_auto(A, B) do {} while(0)
 #endif
