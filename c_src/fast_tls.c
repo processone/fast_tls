@@ -658,7 +658,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
         return enif_make_badarg(env);
     if (!enif_inspect_iolist_as_binary(env, argv[2], &ciphers_bin))
         return enif_make_badarg(env);
-    if (!enif_inspect_iolist_as_binary(env, argv[2], &protocol_options_bin))
+    if (!enif_inspect_iolist_as_binary(env, argv[3], &protocol_options_bin))
         return enif_make_badarg(env);
     if (!enif_inspect_iolist_as_binary(env, argv[4], &dhfile_bin))
         return enif_make_badarg(env);
@@ -669,7 +669,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     size_t po_len_left = protocol_options_bin.size;
     unsigned char *po = protocol_options_bin.data;
 
-    while (1) {
+    while (po_len_left) {
         unsigned char *pos = memchr(po, '|', po_len_left);
 
         if (!pos) {

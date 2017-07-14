@@ -437,21 +437,30 @@ load_nif_test() ->
     ?assertEqual(ok, load_nif(SOPath)).
 
 transmision_test() ->
-    {LPid, Port} = setup_listener(),
-    setup_sender(Port),
+    {LPid, Port} = setup_listener([]),
+    setup_sender(Port, []),
     LPid ! {stop, self()},
     receive
 	{received, Msg} ->
 	    ?assertEqual(Msg, <<"abcdefghi">>)
     end.
 
-setup_listener() ->
-    {ok, ListenSocket} = gen_tcp:listen(50123,
+not_compatible_transmision_test() ->
+    {LPid, Port} = setup_listener([{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1|no_tlsv1_1">>}]),
+    setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2">>}]),
+    LPid ! {stop, self()},
+    receive
+	{received, Msg} ->
+	    ?assertEqual(Msg, <<>>)
+    end.
+
+setup_listener(Opts) ->
+    {ok, ListenSocket} = gen_tcp:listen(0,
 					[binary, {packet, 0}, {active, false},
 					 {reuseaddr, true}, {nodelay, true}]),
     Pid = spawn(fun() ->
 	{ok, Socket} = gen_tcp:accept(ListenSocket),
-	{ok, TLSSock} = tcp_to_tls(Socket, [{certfile, <<"../tests/cert.pem">>}]),
+	{ok, TLSSock} = tcp_to_tls(Socket, [{certfile, <<"../tests/cert.pem">>} | Opts]),
 	listener_loop(TLSSock, <<>>)
 		end),
     {ok, Port} = inet:port(ListenSocket),
@@ -470,24 +479,28 @@ listener_loop(TLSSock, Msg) ->
 	    listener_loop(TLSSock, <<Msg/binary, Data/binary>>)
     end.
 
-setup_sender(Port) ->
+setup_sender(Port, Opts) ->
     {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, Port, [
 	binary, {packet, 0}, {active, false},
 	{reuseaddr, true}, {nodelay, true}]),
     spawn(fun() ->
-	{ok, TLSSock} = tcp_to_tls(Socket, [connect, {certfile, <<"../tests/cert.pem">>}]),
+	{ok, TLSSock} = tcp_to_tls(Socket, [connect, {certfile, <<"../tests/cert.pem">>} | Opts]),
 	sender_loop(TLSSock)
 	  end),
     ok.
 
 sender_loop(TLSSock) ->
-    recv(TLSSock, 0, 1000),
-    ok = send(TLSSock, <<"abc">>),
-    recv(TLSSock, 0, 1000),
-    ok = send(TLSSock, <<"def">>),
-    recv(TLSSock, 0, 1000),
-    ok = send(TLSSock, <<"ghi">>),
-    recv(TLSSock, 0, 1000),
-    close(TLSSock).
+    try
+	recv(TLSSock, 0, 1000),
+	ok = send(TLSSock, <<"abc">>),
+	recv(TLSSock, 0, 1000),
+	ok = send(TLSSock, <<"def">>),
+	recv(TLSSock, 0, 1000),
+	ok = send(TLSSock, <<"ghi">>),
+	recv(TLSSock, 0, 1000),
+	close(TLSSock)
+    catch
+        _:_  -> ok
+    end.
 
 -endif.
