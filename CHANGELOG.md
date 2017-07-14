@@ -1,3 +1,12 @@
+# Version 1.0.14
+
+* Improve ECDH curve handling (thanks to user pitchum)
+* Fix bug in handling protocol_options option
+
+# Version 1.0.13
+
+* Convert to use NIF (Paweł Chmielowski)
+
 # Version 1.0.12
 
 * depends on p1_utils-1.0.9
