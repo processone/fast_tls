@@ -436,22 +436,32 @@ load_nif_test() ->
     SOPath = p1_nif_utils:get_so_path(fast_tls, [], "fast_tls"),
     ?assertEqual(ok, load_nif(SOPath)).
 
-transmision_test() ->
+transmission_test() ->
     {LPid, Port} = setup_listener([]),
-    setup_sender(Port, []),
+    SPid = setup_sender(Port, []),
     LPid ! {stop, self()},
     receive
 	{received, Msg} ->
 	    ?assertEqual(Msg, <<"abcdefghi">>)
+    end,
+    SPid ! {stop, self()},
+    receive
+	{result, Res} ->
+	    ?assertEqual(ok, Res)
     end.
 
-not_compatible_transmision_test() ->
+not_compatible_protocol_options_test() ->
     {LPid, Port} = setup_listener([{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1|no_tlsv1_1">>}]),
-    setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2">>}]),
+    SPid = setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2">>}]),
     LPid ! {stop, self()},
     receive
 	{received, Msg} ->
 	    ?assertEqual(Msg, <<>>)
+    end,
+    SPid ! {stop, self()},
+    receive
+	{result, Res} ->
+	    ?assertEqual({badmatch, {error, enotconn}}, Res)
     end.
 
 setup_listener(Opts) ->
@@ -486,21 +496,25 @@ setup_sender(Port, Opts) ->
     spawn(fun() ->
 	{ok, TLSSock} = tcp_to_tls(Socket, [connect, {certfile, <<"../tests/cert.pem">>} | Opts]),
 	sender_loop(TLSSock)
-	  end),
-    ok.
+	  end).
 
 sender_loop(TLSSock) ->
-    try
-	recv(TLSSock, 0, 1000),
-	ok = send(TLSSock, <<"abc">>),
-	recv(TLSSock, 0, 1000),
-	ok = send(TLSSock, <<"def">>),
-	recv(TLSSock, 0, 1000),
-	ok = send(TLSSock, <<"ghi">>),
-	recv(TLSSock, 0, 1000),
-	close(TLSSock)
-    catch
-        _:_  -> ok
+    Res = try
+	      recv(TLSSock, 0, 1000),
+	      ok = send(TLSSock, <<"abc">>),
+	      recv(TLSSock, 0, 1000),
+	      ok = send(TLSSock, <<"def">>),
+	      recv(TLSSock, 0, 1000),
+	      ok = send(TLSSock, <<"ghi">>),
+	      recv(TLSSock, 0, 1000),
+	      close(TLSSock),
+	      ok
+	  catch
+	      _:Err -> Err
+	  end,
+    receive
+	{stop, Pid} ->
+	    Pid ! {result, Res}
     end.
 
 -endif.
