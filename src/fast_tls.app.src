@@ -31,7 +31,9 @@
 
   
   %% hex.pm packaging:
-  {files, ["src/", "c_src/fast_tls_drv.c", "c_src/p1_sha.c", "c_src/options.h", "c_src/stdint.h", "rebar.config", "rebar.config.script", "README.md", "LICENSE.txt"]},
+  {files, ["src/", "c_src/fast_tls.c", "c_src/hashmap.c", "c_src/hashmap.h",
+	   "c_src/options.h", "c_src/p1_sha.c", "c_src/stdint.h",
+	   "rebar.config", "rebar.config.script", "README.md", "LICENSE.txt"]},
   {licenses, ["Apache 2.0"]},
   {maintainers, ["ProcessOne"]},
   {links, [{"Github", "https://github.com/processone/fast_tls"}]}]}.
