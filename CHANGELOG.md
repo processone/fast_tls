@@ -1,3 +1,7 @@
+# Version 1.0.15
+
+* Fix Hex packaging
+
 # Version 1.0.14
 
 * Improve ECDH curve handling (thanks to user pitchum)
