@@ -439,29 +439,29 @@ load_nif_test() ->
 transmission_test() ->
     {LPid, Port} = setup_listener([]),
     SPid = setup_sender(Port, []),
-    LPid ! {stop, self()},
-    receive
-	{received, Msg} ->
-	    ?assertEqual(Msg, <<"abcdefghi">>)
-    end,
     SPid ! {stop, self()},
     receive
 	{result, Res} ->
 	    ?assertEqual(ok, Res)
+    end,
+    LPid ! {stop, self()},
+    receive
+	{received, Msg} ->
+	    ?assertEqual(Msg, <<"abcdefghi">>)
     end.
 
 not_compatible_protocol_options_test() ->
-    {LPid, Port} = setup_listener([{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1|no_tlsv1_1">>}]),
-    SPid = setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2">>}]),
+    {LPid, Port} = setup_listener([{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2">>}]),
+    SPid = setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1|no_tlsv1_2">>}]),
+    SPid ! {stop, self()},
+    receive
+	{result, Res} ->
+	    ?assertMatch({badmatch, {error, _}}, Res)
+    end,
     LPid ! {stop, self()},
     receive
 	{received, Msg} ->
 	    ?assertEqual(Msg, <<>>)
-    end,
-    SPid ! {stop, self()},
-    receive
-	{result, Res} ->
-	    ?assertEqual({badmatch, {error, enotconn}}, Res)
     end.
 
 setup_listener(Opts) ->
@@ -479,7 +479,12 @@ setup_listener(Opts) ->
 listener_loop(TLSSock, Msg) ->
     case recv(TLSSock, 1, 1000) of
 	{error, timeout} ->
-	    listener_loop(TLSSock, Msg);
+	    receive
+		{stop, Pid} ->
+		    Pid ! {received, Msg}
+	    after 0 ->
+		listener_loop(TLSSock, Msg)
+	    end;
 	{error, _} ->
 	    receive
 		{stop, Pid} ->
