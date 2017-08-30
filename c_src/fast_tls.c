@@ -377,7 +377,21 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
 #ifndef OPENSSL_NO_ECDH
 
 static void setup_ecdh(SSL_CTX *ctx) {
+#if OPENSSL_VERSION_NUMBER < 0x10002000
+    EC_KEY *ecdh;
+
+    if (SSLeay() < 0x1000005fL) {
+        return;
+    }
+
+    ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+    SSL_CTX_set_options(ctx, SSL_OP_SINGLE_ECDH_USE);
+    SSL_CTX_set_tmp_ecdh(ctx, ecdh);
+
+    EC_KEY_free(ecdh);
+#else
     SSL_CTX_set_ecdh_auto(ctx, 1);
+#endif
 }
 
 #endif
