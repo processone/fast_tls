@@ -44,7 +44,8 @@ static inline hashmap_element_t *get_el(hashmap_t *map, int idx)
   return (hashmap_element_t*)(map->data + ((sizeof(hashmap_element_t) + map->data_size) * idx));
 }
 
-hashmap_t *hashmap_new(int initial_size, int data_size, hashmap_hash_fun_t hash_fun, hashmap_cmp_fun_t cmp_fun)
+hashmap_t *hashmap_new(int initial_size, int data_size, hashmap_hash_fun_t hash_fun, hashmap_cmp_fun_t cmp_fun,
+  hashmap_free_fun_t free_fun)
 {
   hashmap_t *map = (hashmap_t*)enif_alloc(sizeof(hashmap_t));
   if (!map)
@@ -55,6 +56,7 @@ hashmap_t *hashmap_new(int initial_size, int data_size, hashmap_hash_fun_t hash_
   map->size = 0;
   map->hash_fun = hash_fun;
   map->cmp_fun = cmp_fun;
+  map->free_fun = free_fun;
 
   map->data = enif_alloc((sizeof(hashmap_element_t) + data_size) * map->capacity);
   if (!map->data)
@@ -81,6 +83,14 @@ void hashmap_free(hashmap_t *map)
 {
   if (!map)
     return;
+
+  if (map->free_fun) {
+    for (int i = 0; i < map->capacity; i++) {
+      hashmap_element_t *el = get_el(map, i);
+      if (el->used)
+        map->free_fun(el->data);
+    }
+  }
 
   enif_rwlock_destroy(map->lock);
   enif_free(map->data);

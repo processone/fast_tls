@@ -7,6 +7,7 @@
 
 typedef uint32_t (*hashmap_hash_fun_t)(const void *el);
 typedef int (*hashmap_cmp_fun_t)(const void *el1, const void *el2);
+typedef void (*hashmap_free_fun_t)(const void *el);
 
 typedef struct hashmap_element {
   uint32_t hash;
@@ -20,11 +21,13 @@ typedef struct hashmap {
   int data_size;
   hashmap_hash_fun_t hash_fun;
   hashmap_cmp_fun_t cmp_fun;
+  hashmap_free_fun_t free_fun;
   void *data;
   ErlNifRWLock *lock;
 } hashmap_t;
 
-hashmap_t *hashmap_new(int initial_size, int data_size, hashmap_hash_fun_t hash_fun, hashmap_cmp_fun_t cmp_fun);
+hashmap_t *hashmap_new(int initial_size, int data_size, hashmap_hash_fun_t hash_fun, hashmap_cmp_fun_t cmp_fun,
+  hashmap_free_fun_t free_fun);
 void hashmap_free(hashmap_t *map);
 int hashmap_insert(hashmap_t *map, const void *data, void *old_data);
 int hashmap_remove(hashmap_t *map, const void *data, void *old_data);

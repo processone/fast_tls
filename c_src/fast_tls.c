@@ -134,6 +134,10 @@ static int cert_cmp(const void *c1, const void *c2) {
     return strcmp(((cert_info_t *) c1)->key, ((cert_info_t *) c2)->key) == 0;
 }
 
+static void cert_free(const void *c) {
+    enif_free(((cert_info_t *) c)->key);
+}
+
 static state_t *init_tls_state() {
     state_t *state = enif_alloc_resource(tls_state_t, sizeof(state_t));
     if (!state) return NULL;
@@ -300,7 +304,7 @@ static int load(ErlNifEnv *env, void **priv, ERL_NIF_TERM load_info) {
     int i;
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-    err_string_map = hashmap_new(1024, sizeof(ERR_STRING_DATA *), get_err_data_hash, get_err_data_cmp);
+    err_string_map = hashmap_new(1024, sizeof(ERR_STRING_DATA *), get_err_data_hash, get_err_data_cmp, NULL);
 
     /* THIS MAY CRASH AFTER OPNESSL UPGRADE
 
@@ -323,7 +327,7 @@ static int load(ErlNifEnv *env, void **priv, ERL_NIF_TERM load_info) {
     CRYPTO_set_locking_callback(locking_callback);
     CRYPTO_THREADID_set_callback(thread_id_callback);
 
-    certs_map = hashmap_new(16, sizeof(cert_info_t), cert_hash, cert_cmp);
+    certs_map = hashmap_new(16, sizeof(cert_info_t), cert_hash, cert_cmp, cert_free);
 
     ssl_index = SSL_get_ex_new_index(0, "ssl index", NULL, NULL, NULL);
     ErlNifResourceFlags flags = ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER;
@@ -630,8 +634,10 @@ static char *create_ssl_for_cert(char *key_file, char *ciphers, char *dh_file,
             info.ssl_ctx = ctx;
             info.key = enif_alloc(len);
             memcpy(info.key, key, len);
-
-            if (hashmap_insert_no_lock(certs_map, &info, &old_info)) {
+            int hres = hashmap_insert_no_lock(certs_map, &info, &old_info);
+            if (hres < 0) {
+                enif_free(info.key);
+            } else if (hres) {
                 enif_free(old_info.key);
             }
             *retval = SSL_new(ctx);
@@ -695,19 +701,17 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
         po = pos + 1;
     }
 
-    cert_file = enif_alloc(certfile_bin.size + 1);
-    ciphers = enif_alloc(ciphers_bin.size + 1);
-    dh_file = enif_alloc(dhfile_bin.size + 1);
-    ca_file = enif_alloc(cafile_bin.size + 1);
-    hash_key = enif_alloc(certfile_bin.size + ciphers_bin.size +
-                          8 + dhfile_bin.size +
-                          cafile_bin.size + 1);
-    if (!cert_file || !ciphers || !dh_file || !hash_key || !ca_file) {
+    cert_file = enif_alloc(certfile_bin.size + 1 +
+        ciphers_bin.size + 1 +
+        dhfile_bin.size + 1 +
+        cafile_bin.size + 1 +
+        certfile_bin.size + ciphers_bin.size + 8 + dhfile_bin.size + cafile_bin.size + 1);
+    ciphers = cert_file + certfile_bin.size + 1;
+    dh_file = ciphers + ciphers_bin.size + 1;
+    ca_file = dh_file + dhfile_bin.size + 1;
+    hash_key = ca_file + cafile_bin.size + 1;
+    if (!cert_file) {
         enif_free(cert_file);
-        enif_free(ciphers);
-        enif_free(dh_file);
-        enif_free(ca_file);
-        enif_free(hash_key);
         return enif_make_badarg(env);
     }
 
@@ -728,10 +732,15 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
 
     char *err_str = create_ssl_for_cert(cert_file, ciphers, dh_file,
                                         ca_file, hash_key, &state->ssl);
-    if (err_str)
+    if (err_str) {
+        enif_free(cert_file);
         return ssl_error(env, err_str);
+    }
 
-    if (!state->ssl) return ssl_error(env, "SSL_new failed");
+    if (!state->ssl) {
+        enif_free(cert_file);
+        return ssl_error(env, "SSL_new failed");
+    }
 
     if (flags & VERIFY_NONE)
         SSL_set_verify(state->ssl, SSL_VERIFY_NONE, verify_callback);
@@ -762,10 +771,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
         SSL_set_connect_state(state->ssl);
     }
 
-    enif_free(hash_key);
     enif_free(cert_file);
-    enif_free(ciphers);
-    enif_free(dh_file);
     ERL_NIF_TERM result = enif_make_resource(env, state);
     enif_release_resource(state);
     return OK_T(result);
