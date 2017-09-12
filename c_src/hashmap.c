@@ -85,7 +85,8 @@ void hashmap_free(hashmap_t *map)
     return;
 
   if (map->free_fun) {
-    for (int i = 0; i < map->capacity; i++) {
+    int i;
+    for (i = 0; i < map->capacity; i++) {
       hashmap_element_t *el = get_el(map, i);
       if (el->used)
         map->free_fun(el->data);
