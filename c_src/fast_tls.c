@@ -659,17 +659,20 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     unsigned int flags;
     char *cert_file = NULL, *ciphers = NULL;
     char *dh_file = NULL, *hash_key = NULL, *ca_file = NULL;
+    char *sni = NULL;
     ErlNifBinary ciphers_bin;
     ErlNifBinary certfile_bin;
     ErlNifBinary protocol_options_bin;
     ErlNifBinary dhfile_bin;
     ErlNifBinary cafile_bin;
+    ErlNifBinary sni_bin;
+    ErlNifBinary alpn_bin;
     long options = 0L;
     state_t *state = NULL;
 
     ERR_clear_error();
 
-    if (argc != 6)
+    if (argc != 8)
         return enif_make_badarg(env);
 
     if (!enif_get_uint(env, argv[0], &flags))
@@ -683,6 +686,10 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     if (!enif_inspect_iolist_as_binary(env, argv[4], &dhfile_bin))
         return enif_make_badarg(env);
     if (!enif_inspect_iolist_as_binary(env, argv[5], &cafile_bin))
+        return enif_make_badarg(env);
+    if (!enif_inspect_iolist_as_binary(env, argv[6], &sni_bin))
+        return enif_make_badarg(env);
+    if (!enif_inspect_iolist_as_binary(env, argv[7], &alpn_bin))
         return enif_make_badarg(env);
 
     command = flags & 0xffff;
@@ -715,6 +722,16 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
         return enif_make_badarg(env);
     }
 
+    if (sni_bin.size) {
+      sni = enif_alloc(sni_bin.size + 1);
+      if (!sni) {
+        enif_free(cert_file);
+	return enif_make_badarg(env);
+      } else {
+	sni[sni_bin.size] = 0;
+      }
+    }
+
     state = init_tls_state();
     if (!state) return ERR_T(enif_make_atom(env, "enomem"));
 
@@ -726,6 +743,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     dh_file[dhfile_bin.size] = 0;
     memcpy(ca_file, cafile_bin.data, cafile_bin.size);
     ca_file[cafile_bin.size] = 0;
+    memcpy(sni, sni_bin.data, sni_bin.size);
 
     sprintf(hash_key, "%s%s%08lx%s%s", cert_file, ciphers,
             options, dh_file, ca_file);
@@ -734,11 +752,13 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
                                         ca_file, hash_key, &state->ssl);
     if (err_str) {
         enif_free(cert_file);
+	enif_free(sni);
         return ssl_error(env, err_str);
     }
 
     if (!state->ssl) {
         enif_free(cert_file);
+	enif_free(sni);
         return ssl_error(env, "SSL_new failed");
     }
 
@@ -768,10 +788,18 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
 
         SSL_set_options(state->ssl, options);
 
+	if (sni) SSL_set_tlsext_host_name(state->ssl, sni);
+
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+	if (alpn_bin.size)
+	  SSL_set_alpn_protos(state->ssl, alpn_bin.data, alpn_bin.size);
+#endif
+
         SSL_set_connect_state(state->ssl);
     }
 
     enif_free(cert_file);
+    enif_free(sni);
     ERL_NIF_TERM result = enif_make_resource(env, state);
     enif_release_resource(state);
     return OK_T(result);
@@ -1093,7 +1121,7 @@ static ERL_NIF_TERM invalidate_nif(ErlNifEnv *env, int argc,
 
 static ErlNifFunc nif_funcs[] =
         {
-                {"open_nif",                 6, open_nif},
+                {"open_nif",                 8, open_nif},
                 {"set_encrypted_input_nif",  2, set_encrypted_input_nif},
                 {"set_decrypted_output_nif", 2, set_decrypted_output_nif},
                 {"get_decrypted_input_nif",  2, get_decrypted_input_nif},

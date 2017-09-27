@@ -29,7 +29,7 @@
 
 -behaviour(gen_server).
 
--export([open_nif/6, get_decrypted_input_nif/2,
+-export([open_nif/8, get_decrypted_input_nif/2,
 	 set_encrypted_input_nif/2, get_encrypted_output_nif/1,
 	 set_decrypted_output_nif/2, get_peer_certificate_nif/1,
 	 get_verify_result_nif/1, invalidate_nif/1]).
@@ -93,7 +93,7 @@ init([]) ->
             {stop, Why}
     end.
 
-open_nif(_Flags, _CertFile, _Ciphers, _ProtocolOpts, _DHFile, _CAFile) ->
+open_nif(_Flags, _CertFile, _Ciphers, _ProtocolOpts, _DHFile, _CAFile, _SNI, _ALPN) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 get_decrypted_input_nif(_Port, _Length) ->
@@ -181,8 +181,20 @@ tcp_to_tls(TCPSocket, Options) ->
 			 false ->
 			     <<>>
 		     end,
+	    ServerName = case lists:keysearch(sni, 1, Options) of
+			     {value, {sni, SNI}} ->
+				 iolist_to_binary(SNI);
+			     false ->
+				 <<>>
+			 end,
+	    ALPN = case lists:keysearch(alpn, 1, Options) of
+		       {value, {alpn, ProtoList}} ->
+			   encode_alpn(ProtoList);
+		       false ->
+			   <<>>
+		   end,
 	    case open_nif(Command bor Flags, CertFile, Ciphers, ProtocolOpts,
-			  DHFile, CAFile) of
+			  DHFile, CAFile, ServerName, ALPN) of
 		{ok, Port} ->
 		    {ok, #tlssock{tcpsock = TCPSocket, tlsport = Port}};
 		Err = {error, _} ->
@@ -413,6 +425,9 @@ cert_verify_code(X) ->
 
 integer_to_binary(I) ->
     list_to_binary(integer_to_list(I)).
+
+encode_alpn(ProtoList) ->
+    [<<(size(Proto)), Proto/binary>> || Proto <- ProtoList, Proto /= <<>>].
 
 load_nif() ->
     SOPath = p1_nif_utils:get_so_path(fast_tls, [fast_tls], "fast_tls"),
