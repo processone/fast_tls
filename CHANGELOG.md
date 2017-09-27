@@ -1,5 +1,6 @@
 # Version 1.0.16
 
+* Updating p1_utils to version 1.0.10.
 * Fix couple memory leaks
 * Make ECDH work on openssl < 1.0.2
 * Add SNI and ALPN support for client connections
