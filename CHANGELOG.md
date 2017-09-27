@@ -1,3 +1,9 @@
+# Version 1.0.16
+
+* Fix couple memory leaks
+* Make ECDH work on openssl < 1.0.2
+* Add SNI and ALPN support for client connections
+
 # Version 1.0.15
 
 * Fix Hex packaging
