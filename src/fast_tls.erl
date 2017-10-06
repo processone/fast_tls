@@ -333,7 +333,7 @@ get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
 	    catch _:_ ->
 		    error
 	    end;
-      <<1>> -> error
+	{error, _} -> error
     end.
 
 -spec get_verify_result(tls_socket()) -> byte().
