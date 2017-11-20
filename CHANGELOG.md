@@ -1,3 +1,7 @@
+# Version 1.0.17
+
+* Fix case clause introduced after migration to NIF
+
 # Version 1.0.16
 
 * Updating p1_utils to version 1.0.10.
