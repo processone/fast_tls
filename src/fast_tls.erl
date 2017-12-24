@@ -39,7 +39,8 @@
 	 setopts/2, sockname/1, peername/1,
 	 controlling_process/2, close/1,
 	 get_peer_certificate/1, get_peer_certificate/2,
-	 get_verify_result/1, get_cert_verify_string/2]).
+	 get_verify_result/1, get_cert_verify_string/2,
+	 add_certfile/2, get_certfile/1, delete_certfile/1]).
 
 %% Internal exports, call-back functions.
 -export([init/1, handle_call/3, handle_cast/2,
@@ -114,6 +115,15 @@ get_peer_certificate_nif(_Port) ->
 get_verify_result_nif(_Port) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
+add_certfile_nif(_Domain, _File) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+get_certfile_nif(_Domain) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+delete_certfile_nif(_Domain) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
 invalidate_nif(_Port) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
@@ -141,8 +151,12 @@ terminate(_Reason, _State) ->
                                        {ok, tls_socket()}.
 
 tcp_to_tls(TCPSocket, Options) ->
-    case lists:keysearch(certfile, 1, Options) of
-	{value, {certfile, CertFile}} ->
+    Command = case lists:member(connect, Options) of
+		  true -> ?SET_CERTIFICATE_FILE_CONNECT;
+		  false -> ?SET_CERTIFICATE_FILE_ACCEPT
+	      end,
+    CertFile = proplists:get_value(certfile, Options, ""),
+    if CertFile /= [] orelse Command == ?SET_CERTIFICATE_FILE_ACCEPT ->
 	    Flags1 = case lists:member(verify_none, Options) of
 			 true -> ?VERIFY_NONE;
 			 false -> 0
@@ -152,10 +166,6 @@ tcp_to_tls(TCPSocket, Options) ->
 			 false -> 0
 		     end,
 	    Flags = Flags1 bor Flags2,
-	    Command = case lists:member(connect, Options) of
-			  true -> ?SET_CERTIFICATE_FILE_CONNECT;
-			  false -> ?SET_CERTIFICATE_FILE_ACCEPT
-		      end,
 	    Ciphers =
 	    case lists:keysearch(ciphers, 1, Options) of
 		{value, {ciphers, C}} ->
@@ -200,7 +210,7 @@ tcp_to_tls(TCPSocket, Options) ->
 		Err = {error, _} ->
 		    Err
 	    end;
-	false -> {error, no_certfile}
+	true -> {error, no_certfile}
     end.
 
 -spec tls_to_tcp(tls_socket()) -> inet:socket().
@@ -360,6 +370,19 @@ cert_is_self_signed(#'Certificate'{} = Cert) ->
 cert_is_self_signed(Cert) ->
     public_key:pkix_is_self_signed(Cert).
 
+-spec add_certfile(iodata(), iodata()) -> ok.
+add_certfile(Domain, File) ->
+    add_certfile_nif(Domain, File).
+
+%% @doc This function is intended for tests only
+-spec get_certfile(iodata()) -> {ok, binary()} | error.
+get_certfile(Domain) ->
+    get_certfile_nif(Domain).
+
+%% @doc Returns `true` if element is deleted, `false` otherwise
+-spec delete_certfile(iodata()) -> boolean().
+delete_certfile(Domain) ->
+    delete_certfile_nif(Domain).
 
 cert_verify_code(0) -> <<"ok">>;
 cert_verify_code(2) ->
