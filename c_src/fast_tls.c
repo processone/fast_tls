@@ -557,7 +557,7 @@ static int ssl_sni_callback(const SSL *s, int *foo, void *data) {
     }
   } else if (strlen(state->cert_file) == 0) {
     state->sni_error =
-      "Failed to find a certificating matching the domain in SNI extension";
+      "Failed to find a certificate matching the domain in SNI extension";
     ret = SSL_TLSEXT_ERR_ALERT_FATAL;
   }
   hashmap_unlock(certfiles_map, 0);
