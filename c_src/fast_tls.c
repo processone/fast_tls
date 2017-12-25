@@ -51,6 +51,7 @@ typedef struct {
     char *dh_file;
     char *ca_file;
     long options;
+    char *sni_error;
 } state_t;
 
 static int ssl_index;
@@ -550,9 +551,13 @@ static int ssl_sni_callback(const SSL *s, int *foo, void *data) {
   if (info) {
     if (strcmp(info->file, state->cert_file))
       err_str = create_ssl_for_cert(info->file, state);
-    if (err_str)
+    if (err_str) {
+      state->sni_error = err_str;
       ret = SSL_TLSEXT_ERR_ALERT_FATAL;
+    }
   } else if (strlen(state->cert_file) == 0) {
+    state->sni_error =
+      "Failed to find a certificating matching the domain in SNI extension";
     ret = SSL_TLSEXT_ERR_ALERT_FATAL;
   }
   hashmap_unlock(certfiles_map, 0);
@@ -1142,7 +1147,10 @@ static ERL_NIF_TERM get_decrypted_input_nif(ErlNifEnv *env, int argc,
         if (res <= 0) {
             if (SSL_get_error(state->ssl, res) != SSL_ERROR_WANT_READ) {
                 enif_mutex_unlock(state->mtx);
-                return ssl_error(env, "SSL_do_handshake failed");
+		if (state->sni_error)
+		  return ssl_error(env, state->sni_error);
+		else
+		  return ssl_error(env, "SSL_do_handshake failed");
             }
         }
     }
