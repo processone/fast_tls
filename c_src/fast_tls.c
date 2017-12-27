@@ -1147,7 +1147,15 @@ static ERL_NIF_TERM get_decrypted_input_nif(ErlNifEnv *env, int argc,
         if (res <= 0) {
             if (SSL_get_error(state->ssl, res) != SSL_ERROR_WANT_READ) {
                 enif_mutex_unlock(state->mtx);
-		if (state->sni_error)
+		int reason = ERR_GET_REASON(ERR_peek_error());
+		if (reason == SSL_R_DATA_LENGTH_TOO_LONG ||
+		    reason == SSL_R_PACKET_LENGTH_TOO_LONG ||
+		    reason == SSL_R_UNKNOWN_PROTOCOL ||
+		    reason == SSL_R_UNEXPECTED_MESSAGE ||
+		    reason == SSL_R_WRONG_VERSION_NUMBER)
+		  /* Do not report badly formed Client Hello */
+		  return ERR_T(enif_make_atom(env, "closed"));
+		else if (state->sni_error)
 		  return ssl_error(env, state->sni_error);
 		else
 		  return ssl_error(env, "SSL_do_handshake failed");
