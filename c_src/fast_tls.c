@@ -1316,6 +1316,7 @@ static ERL_NIF_TERM get_certfile_nif(ErlNifEnv *env, int argc,
       result = enif_make_atom(env, "error");
     }
     hashmap_unlock(certfiles_map, 0);
+    enif_free(key);
   } else {
     result = enif_make_atom(env, "error");
   }
