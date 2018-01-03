@@ -185,142 +185,8 @@ static int atomic_add_callback(int *pointer, int amount, int type, const char *f
     return __sync_add_and_fetch(pointer, amount);
 }
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-
-static LHASH_OF(ERR_STRING_DATA) *cb_err_get(int create) {
-    return NULL;
-}
-
-static void cb_err_del(void) {
-}
-
-static hashmap_t *err_string_map;
-
-static uint32_t get_err_data_hash(const void *el) {
-    return (uint32_t) (*(ERR_STRING_DATA **) el)->error;
-}
-
-static int get_err_data_cmp(const void *el1, const void *el2) {
-    return (*(ERR_STRING_DATA **) el1)->error == (*(ERR_STRING_DATA **) el2)->error;
-}
-
-static ERR_STRING_DATA *cb_err_get_item(const ERR_STRING_DATA *d) {
-    ERR_STRING_DATA **p = (ERR_STRING_DATA **) hashmap_lookup(err_string_map, &d);
-    if (p)
-        return *p;
-
-    return NULL;
-}
-
-static ERR_STRING_DATA *cb_err_set_item(ERR_STRING_DATA *d) {
-    ERR_STRING_DATA *old_data;
-    int used = hashmap_insert(err_string_map, &d, &old_data);
-
-    if (used == 1)
-        return old_data;
-
-    return NULL;
-}
-
-static ERR_STRING_DATA *cb_err_del_item(ERR_STRING_DATA *d) {
-    ERR_STRING_DATA *old_data;
-    int used = hashmap_remove(err_string_map, &d, &old_data);
-
-    if (used == 1)
-        return old_data;
-
-    return NULL;
-}
-
-static LHASH_OF(ERR_STATE) *cb_thread_get(int create) {
-    return NULL;
-}
-
-static void cb_thread_release(LHASH_OF(ERR_STATE) **hash) {
-}
-
-static ErlNifTSDKey err_funs_tls_key;
-
-static ERR_STATE *cb_thread_get_item(const ERR_STATE *ARG) {
-    return enif_tsd_get(err_funs_tls_key);
-}
-
-static ERR_STATE *cb_thread_set_item(ERR_STATE *ARG) {
-    void *prev_val = enif_tsd_get(err_funs_tls_key);
-    enif_tsd_set(err_funs_tls_key, ARG);
-
-    return prev_val;
-}
-
-static void cb_thread_del_item(const ERR_STATE *ARG) {
-    // Do nothing functions for freeing are not exported, we will leak
-    // memory but only one struct per destroyed thread, and erlang don't do that much
-}
-
-static int cb_get_next_lib(void) {
-    static int id = ERR_LIB_USER;
-    return __sync_add_and_fetch(&id, 1);
-}
-
-void tls_item_delete(void *A) {
-    // Do nothing, openssl don't export free function for those objects
-}
-
-struct priv_ERR_FNS {
-    /* Works on the "error_hash" string table */
-    LHASH_OF(ERR_STRING_DATA) *(*cb_err_get)(int create);
-
-    void (*cb_err_del)(void);
-
-    ERR_STRING_DATA *(*cb_err_get_item)(const ERR_STRING_DATA *);
-
-    ERR_STRING_DATA *(*cb_err_set_item)(ERR_STRING_DATA *);
-
-    ERR_STRING_DATA *(*cb_err_del_item)(ERR_STRING_DATA *);
-    /* Works on the "thread_hash" error-state table */
-    LHASH_OF(ERR_STATE) *(*cb_thread_get)(int create);
-
-    void (*cb_thread_release)(LHASH_OF(ERR_STATE) **hash);
-
-    ERR_STATE *(*cb_thread_get_item)(const ERR_STATE *);
-
-    ERR_STATE *(*cb_thread_set_item)(ERR_STATE *);
-
-    void (*cb_thread_del_item)(const ERR_STATE *);
-
-    /* Returns the next available error "library" numbers */
-    int (*cb_get_next_lib)(void);
-};
-
-static struct priv_ERR_FNS err_fns_impl = {
-        cb_err_get,
-        cb_err_del,
-        cb_err_get_item,
-        cb_err_set_item,
-        cb_err_del_item,
-        cb_thread_get,
-        cb_thread_release,
-        cb_thread_get_item,
-        cb_thread_set_item,
-        cb_thread_del_item,
-        cb_get_next_lib
-};
-#endif
-
 static int load(ErlNifEnv *env, void **priv, ERL_NIF_TERM load_info) {
     int i;
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    err_string_map = hashmap_new(1024, sizeof(ERR_STRING_DATA *), get_err_data_hash, get_err_data_cmp, NULL);
-
-    /* THIS MAY CRASH AFTER OPNESSL UPGRADE
-
-       We are using somewhat private structures of openssl to do this, if our priv_ERR_FNS wouldn't match
-       version included in openssl it will cause problem.
-     */
-    enif_tsd_key_create("openssl_err_funs_key", &err_funs_tls_key);
-    ERR_set_implementation((const ERR_FNS *) &err_fns_impl);
-#endif
 
     CRYPTO_set_mem_functions(our_alloc, our_realloc, our_free);
     OpenSSL_add_ssl_algorithms();
@@ -350,9 +216,6 @@ static void unload(ErlNifEnv *env, void *priv) {
     cert_info_t *info = NULL;
     cert_info_t *tmp = NULL;
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    hashmap_free(err_string_map);
-#endif
     enif_rwlock_rwlock(certs_map_lock);
     HASH_ITER(hh, certs_map, info, tmp) {
       HASH_DEL(certs_map, info);
