@@ -25,7 +25,6 @@
 #include <stdint.h>
 #include <ctype.h>
 #include "options.h"
-#include "hashmap.h"
 #include "uthash.h"
 
 #define BUF_SIZE 1024
