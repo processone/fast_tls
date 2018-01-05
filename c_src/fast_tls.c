@@ -398,7 +398,7 @@ static cert_info_t *lookup_certfile(const char *domain) {
       else {
 	/* Replace the first domain part with '*' and retry */
 	char *dot = strchr(name, '.');
-	if (dot != NULL && dot != name) {
+	if (dot != NULL && name[0] != '.') {
 	  char *glob = dot - 1;
 	  glob[0] = '*';
 	  HASH_FIND_STR(certfiles_map, glob, info);
