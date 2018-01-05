@@ -29,11 +29,9 @@
 
 #define BUF_SIZE 1024
 
-/*
 #define enif_alloc malloc
 #define enif_free free
 #define enif_realloc realloc
-*/
 
 typedef struct {
     BIO *bio_read;
@@ -68,20 +66,6 @@ typedef unsigned __int32 uint32_t;
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
 #define DH_set0_pqg(dh, dh_p, param, dh_g) (dh)->p = dh_p; (dh)->g = dh_g
-#define our_alloc enif_alloc
-#define our_realloc enif_realloc
-#define our_free enif_free
-#else
-static void *our_alloc(size_t size, const char *file, int line) {
-    return enif_alloc(size);
-}
-static void * our_realloc(void *ptr, size_t size, const char *file, int line) {
-    return enif_realloc(ptr, size);
-}
-
-static void our_free(void *ptr, const char *file, int line) {
-    enif_free(ptr);
-}
 #endif
 
 void __free(void *ptr, size_t size) {
@@ -188,7 +172,6 @@ static int atomic_add_callback(int *pointer, int amount, int type, const char *f
 static int load(ErlNifEnv *env, void **priv, ERL_NIF_TERM load_info) {
     int i;
 
-    CRYPTO_set_mem_functions(our_alloc, our_realloc, our_free);
     OpenSSL_add_ssl_algorithms();
     SSL_load_error_strings();
 
@@ -236,9 +219,6 @@ static void unload(ErlNifEnv *env, void *priv) {
     certfiles_map_lock = NULL;
     for (i = 0; i < CRYPTO_num_locks(); i++)
         enif_mutex_destroy(mtx_buf[i]);
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined LIBRESSL_VERSION_NUMBER
-    OPENSSL_cleanup();
-#endif
 }
 
 static int is_modified(char *file, time_t *known_mtime) {
