@@ -132,7 +132,10 @@ static state_t *init_tls_state() {
     if (!state) return NULL;
     memset(state, 0, sizeof(state_t));
     state->mtx = enif_mutex_create("");
-    if (!state->mtx) return NULL;
+    if (!state->mtx) {
+      enif_release_resource(state);
+      return NULL;
+    }
     state->valid = 1;
     return state;
 }
@@ -219,6 +222,8 @@ static void unload(ErlNifEnv *env, void *priv) {
     certfiles_map_lock = NULL;
     for (i = 0; i < CRYPTO_num_locks(); i++)
         enif_mutex_destroy(mtx_buf[i]);
+    enif_free(mtx_buf);
+    mtx_buf = NULL;
 }
 
 static int is_modified(char *file, time_t *known_mtime) {
@@ -630,8 +635,6 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
                              const ERL_NIF_TERM argv[]) {
     unsigned int command;
     unsigned int flags;
-    char *cert_file = NULL, *ciphers = NULL;
-    char *dh_file = NULL, *ca_file = NULL;
     char *sni = NULL;
     ErlNifBinary ciphers_bin;
     ErlNifBinary certfile_bin;
@@ -681,60 +684,44 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
         po = pos + 1;
     }
 
-    cert_file = enif_alloc(certfile_bin.size + 1 +
-			   ciphers_bin.size + 1 +
-			   dhfile_bin.size + 1 +
-			   cafile_bin.size + 1);
-    ciphers = cert_file + certfile_bin.size + 1;
-    dh_file = ciphers + ciphers_bin.size + 1;
-    ca_file = dh_file + dhfile_bin.size + 1;
-    if (!cert_file) {
-        enif_free(cert_file);
-        return enif_make_badarg(env);
-    }
-
-    if (sni_bin.size) {
-      sni = enif_alloc(sni_bin.size + 1);
-      if (!sni) {
-        enif_free(cert_file);
-	return enif_make_badarg(env);
-      } else {
-	sni[sni_bin.size] = 0;
-      }
-    }
-
     state = init_tls_state();
     if (!state) return ERR_T(enif_make_atom(env, "enomem"));
 
-    memcpy(cert_file, certfile_bin.data, certfile_bin.size);
-    cert_file[certfile_bin.size] = 0;
-    memcpy(ciphers, ciphers_bin.data, ciphers_bin.size);
-    ciphers[ciphers_bin.size] = 0;
-    memcpy(dh_file, dhfile_bin.data, dhfile_bin.size);
-    dh_file[dhfile_bin.size] = 0;
-    memcpy(ca_file, cafile_bin.data, cafile_bin.size);
-    ca_file[cafile_bin.size] = 0;
-    memcpy(sni, sni_bin.data, sni_bin.size);
-
-    state->cert_file = cert_file;
-    state->ciphers = ciphers;
-    state->dh_file = dh_file;
-    state->ca_file = ca_file;
+    state->cert_file = enif_alloc(certfile_bin.size + 1 +
+				  ciphers_bin.size + 1 +
+				  dhfile_bin.size + 1 +
+				  cafile_bin.size + 1 +
+				  sni_bin.size + 1);
+    if (!state->cert_file) {
+      enif_release_resource(state);
+      return ERR_T(enif_make_atom(env, "enomem"));
+    }
+    state->ciphers = state->cert_file + certfile_bin.size + 1;
+    state->dh_file = state->ciphers + ciphers_bin.size + 1;
+    state->ca_file = state->dh_file + dhfile_bin.size + 1;
+    sni = state->ca_file + cafile_bin.size + 1;
     state->options = options;
 
-    char *err_str = create_ssl_for_cert(cert_file, state);
+    memcpy(state->cert_file, certfile_bin.data, certfile_bin.size);
+    state->cert_file[certfile_bin.size] = 0;
+    memcpy(state->ciphers, ciphers_bin.data, ciphers_bin.size);
+    state->ciphers[ciphers_bin.size] = 0;
+    memcpy(state->dh_file, dhfile_bin.data, dhfile_bin.size);
+    state->dh_file[dhfile_bin.size] = 0;
+    memcpy(state->ca_file, cafile_bin.data, cafile_bin.size);
+    state->ca_file[cafile_bin.size] = 0;
+    memcpy(sni, sni_bin.data, sni_bin.size);
+    sni[sni_bin.size] = 0;
+
+    char *err_str = create_ssl_for_cert(state->cert_file, state);
     if (err_str) {
-        enif_free(cert_file);
-	state->cert_file = NULL;
-	enif_free(sni);
-        return ssl_error(env, err_str);
+      enif_release_resource(state);
+      return ssl_error(env, err_str);
     }
 
     if (!state->ssl) {
-        enif_free(cert_file);
-	state->cert_file = NULL;
-	enif_free(sni);
-        return ssl_error(env, "SSL_new failed");
+      enif_release_resource(state);
+      return ssl_error(env, "SSL_new failed");
     }
 
     if (flags & VERIFY_NONE)
@@ -763,7 +750,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
 
         SSL_set_options(state->ssl, options);
 
-	if (sni) SSL_set_tlsext_host_name(state->ssl, sni);
+	if (strlen(sni)>0) SSL_set_tlsext_host_name(state->ssl, sni);
 
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
 	if (alpn_bin.size)
@@ -773,7 +760,6 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
         SSL_set_connect_state(state->ssl);
     }
 
-    enif_free(sni);
     ERL_NIF_TERM result = enif_make_resource(env, state);
     enif_release_resource(state);
     return OK_T(result);
