@@ -82,7 +82,8 @@ void __free(void *ptr, size_t size) {
 #define SSL_CTX_set_ecdh_auto(A, B) do {} while(0)
 #endif
 
-#define CIPHERS "DEFAULT:!EXPORT:!LOW:!RC4:!SSLv2"
+#define CIPHERS "HIGH:!aNULL:!eNULL:!3DES:@STRENGTH"
+#define PROTOCOL_OPTIONS "no_sslv3|cipher_server_preference|no_compression"
 
 static ErlNifResourceType *tls_state_t = NULL;
 static ErlNifMutex **mtx_buf = NULL;
@@ -645,6 +646,8 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     ErlNifBinary alpn_bin;
     long options = 0L;
     state_t *state = NULL;
+    size_t po_len_left = 0;
+    unsigned char *po = NULL;
 
     ERR_clear_error();
 
@@ -669,8 +672,13 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
         return enif_make_badarg(env);
 
     command = flags & 0xffff;
-    size_t po_len_left = protocol_options_bin.size;
-    unsigned char *po = protocol_options_bin.data;
+    if (protocol_options_bin.size) {
+      po_len_left = protocol_options_bin.size;
+      po = protocol_options_bin.data;
+    } else {
+      po = (unsigned char *) PROTOCOL_OPTIONS;
+      po_len_left = strlen((char *) po);
+    }
 
     while (po_len_left) {
         unsigned char *pos = memchr(po, '|', po_len_left);
