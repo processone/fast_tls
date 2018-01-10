@@ -1,3 +1,10 @@
+# Version 1.0.19
+
+* Fix couple memory leaks
+* Switch hashmap to uthash library
+* Use system allocator in openssl
+* Update ciphers and option to safer defaults
+
 # Version 1.0.18
 
 * Do not report badly formed Client Hello as a TLS error
