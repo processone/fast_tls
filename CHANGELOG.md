@@ -1,3 +1,7 @@
+# Version 1.0.20
+
+* Include uthash.h in hex package
+
 # Version 1.0.19
 
 * Fix couple memory leaks
