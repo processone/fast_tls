@@ -52,6 +52,7 @@ typedef struct {
     char *ca_file;
     long options;
     char *sni_error;
+    long command;
 } state_t;
 
 static int ssl_index;
@@ -489,7 +490,9 @@ static ERL_NIF_TERM ssl_error(ErlNifEnv *env, const char *errstr) {
 
 static SSL_CTX *create_new_ctx(char *cert_file, char *ciphers,
 			       char *dh_file, char *ca_file,
+			       unsigned int command,
 			       char **err_str) {
+  long verifyopts;
   int res = 0;
 
   SSL_CTX *ctx = SSL_CTX_new(SSLv23_method());
@@ -518,7 +521,15 @@ static SSL_CTX *create_new_ctx(char *cert_file, char *ciphers,
     }
   }
 
-  SSL_CTX_set_tlsext_servername_callback(ctx, &ssl_sni_callback);
+  if (command == SET_CERTIFICATE_FILE_ACCEPT) {
+    SSL_CTX_set_tlsext_servername_callback(ctx, &ssl_sni_callback);
+    verifyopts = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE;
+    if (ca_file) {
+      SSL_CTX_set_client_CA_list(ctx, SSL_load_client_CA_file(ca_file));
+    }
+  } else {
+    verifyopts = SSL_VERIFY_PEER;
+  }
 
   if (ciphers[0] == 0)
     SSL_CTX_set_cipher_list(ctx, CIPHERS);
@@ -546,9 +557,7 @@ static SSL_CTX *create_new_ctx(char *cert_file, char *ciphers,
 #ifdef SSL_MODE_RELEASE_BUFFERS
   SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
 #endif
-  SSL_CTX_set_verify(ctx,
-		     SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
-		     verify_callback);
+  SSL_CTX_set_verify(ctx, verifyopts, verify_callback);
 
   SSL_CTX_set_info_callback(ctx, &ssl_info_callback);
 
@@ -568,6 +577,7 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
     char *dh_file = state->dh_file;
     char *ca_file = state->ca_file;
     long options = state->options;
+    unsigned int command = state->command;
 
     char *ret = NULL;
     cert_info_t *info = NULL;
@@ -599,7 +609,7 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
         enif_rwlock_runlock(certs_map_lock);
 
         enif_rwlock_rwlock(certs_map_lock);
-	SSL_CTX *ctx = create_new_ctx(cert_file, ciphers, dh_file, ca_file, &ret);
+	SSL_CTX *ctx = create_new_ctx(cert_file, ciphers, dh_file, ca_file, command, &ret);
 	if (ret == NULL) {
 	  new_info = enif_alloc(sizeof(cert_info_t));
 	  if (new_info) {
@@ -709,6 +719,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     state->ca_file = state->dh_file + dhfile_bin.size + 1;
     sni = state->ca_file + cafile_bin.size + 1;
     state->options = options;
+    state->command = command;
 
     memcpy(state->cert_file, certfile_bin.data, certfile_bin.size);
     state->cert_file[certfile_bin.size] = 0;
