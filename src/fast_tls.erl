@@ -40,7 +40,8 @@
 	 controlling_process/2, close/1,
 	 get_peer_certificate/1, get_peer_certificate/2,
 	 get_verify_result/1, get_cert_verify_string/2,
-	 add_certfile/2, get_certfile/1, delete_certfile/1]).
+	 add_certfile/2, get_certfile/1, delete_certfile/1,
+	 clear_cache/0]).
 
 %% Internal exports, call-back functions.
 -export([init/1, handle_call/3, handle_cast/2,
@@ -125,6 +126,9 @@ delete_certfile_nif(_Domain) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 invalidate_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+clear_cache_nif() ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 %%% --------------------------------------------------------
@@ -383,6 +387,13 @@ get_certfile(Domain) ->
 -spec delete_certfile(iodata()) -> boolean().
 delete_certfile(Domain) ->
     delete_certfile_nif(Domain).
+
+%% @doc Clears cached SSL_CTX structures
+%% You MUST call this function if you change content
+%% of your CA, DH or certificate files
+-spec clear_cache() -> ok.
+clear_cache() ->
+    clear_cache_nif().
 
 cert_verify_code(0) -> <<"ok">>;
 cert_verify_code(2) ->

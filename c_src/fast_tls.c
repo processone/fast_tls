@@ -106,9 +106,6 @@ static int set_option_flag(const unsigned char *opt, size_t len, long *flag) {
 typedef struct {
     char *key;
     char *file;
-    time_t key_mtime;
-    time_t dh_mtime;
-    time_t ca_mtime;
     SSL_CTX *ssl_ctx;
     UT_hash_handle hh;
 } cert_info_t;
@@ -127,6 +124,30 @@ static void free_cert_info(cert_info_t *info) {
       SSL_CTX_free(info->ssl_ctx);
     enif_free(info);
   }
+}
+
+static void clear_certs_map() {
+  cert_info_t *info = NULL;
+  cert_info_t *tmp = NULL;
+
+  enif_rwlock_rwlock(certs_map_lock);
+  HASH_ITER(hh, certs_map, info, tmp) {
+    HASH_DEL(certs_map, info);
+    free_cert_info(info);
+  }
+  enif_rwlock_rwunlock(certs_map_lock);
+}
+
+static void clear_certfiles_map() {
+  cert_info_t *info = NULL;
+  cert_info_t *tmp = NULL;
+
+  enif_rwlock_rwlock(certfiles_map_lock);
+  HASH_ITER(hh, certfiles_map, info, tmp) {
+    HASH_DEL(certfiles_map, info);
+    free_cert_info(info);
+  }
+  enif_rwlock_rwunlock(certfiles_map_lock);
 }
 
 static state_t *init_tls_state() {
@@ -201,21 +222,9 @@ static int load(ErlNifEnv *env, void **priv, ERL_NIF_TERM load_info) {
 
 static void unload(ErlNifEnv *env, void *priv) {
     int i;
-    cert_info_t *info = NULL;
-    cert_info_t *tmp = NULL;
 
-    enif_rwlock_rwlock(certs_map_lock);
-    HASH_ITER(hh, certs_map, info, tmp) {
-      HASH_DEL(certs_map, info);
-      free_cert_info(info);
-    }
-    enif_rwlock_rwunlock(certs_map_lock);
-    enif_rwlock_rwlock(certfiles_map_lock);
-    HASH_ITER(hh, certfiles_map, info, tmp) {
-      HASH_DEL(certfiles_map, info);
-      free_cert_info(info);
-    }
-    enif_rwlock_rwunlock(certfiles_map_lock);
+    clear_certs_map();
+    clear_certfiles_map();
     enif_rwlock_destroy(certs_map_lock);
     enif_rwlock_destroy(certfiles_map_lock);
     certs_map = NULL;
@@ -226,23 +235,6 @@ static void unload(ErlNifEnv *env, void *priv) {
         enif_mutex_destroy(mtx_buf[i]);
     enif_free(mtx_buf);
     mtx_buf = NULL;
-}
-
-static int is_modified(char *file, time_t *known_mtime) {
-    struct stat file_stat;
-
-    if (file == NULL) {
-        return 0;
-    } else if (stat(file, &file_stat)) {
-        *known_mtime = 0;
-        return 1;
-    } else {
-        if (*known_mtime != file_stat.st_mtime) {
-            *known_mtime = file_stat.st_mtime;
-            return 1;
-        } else
-            return 0;
-    }
 }
 
 static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
@@ -594,18 +586,11 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
 
     HASH_FIND_STR(certs_map, key, info);
 
-    time_t key_mtime = info ? info->key_mtime : 0;
-    time_t dh_mtime = info ? info->dh_mtime : 0;
-    time_t ca_mtime = info ? info->ca_mtime : 0;
-
     if (strlen(cert_file) == 0) cert_file = NULL;
     if (strlen(dh_file) == 0) dh_file = NULL;
     if (strlen(ca_file) == 0) ca_file = NULL;
 
-    if (is_modified(cert_file, &key_mtime) ||
-        is_modified(dh_file, &dh_mtime) ||
-        is_modified(ca_file, &ca_mtime) ||
-        info == NULL) {
+    if (info == NULL) {
         enif_rwlock_runlock(certs_map_lock);
 
         enif_rwlock_rwlock(certs_map_lock);
@@ -617,9 +602,6 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
 	    new_info->key = enif_alloc(key_size);
 	    if (new_info->key) {
 	      memcpy(new_info->key, key, key_size);
-	      new_info->key_mtime = key_mtime;
-	      new_info->dh_mtime = dh_mtime;
-	      new_info->ca_mtime = ca_mtime;
 	      new_info->ssl_ctx = ctx;
 	      HASH_REPLACE_STR(certs_map, key, new_info, old_info);
 	      free_cert_info(old_info);
@@ -1176,6 +1158,13 @@ static ERL_NIF_TERM get_certfile_nif(ErlNifEnv *env, int argc,
   return result;
 }
 
+static ERL_NIF_TERM clear_cache_nif(ErlNifEnv *env, int argc,
+				    const ERL_NIF_TERM argv[])
+{
+  clear_certs_map();
+  return enif_make_atom(env, "ok");
+}
+
 static ERL_NIF_TERM invalidate_nif(ErlNifEnv *env, int argc,
                                    const ERL_NIF_TERM argv[]) {
     state_t *state = NULL;
@@ -1207,6 +1196,7 @@ static ErlNifFunc nif_funcs[] =
 		{"add_certfile_nif",         2, add_certfile_nif},
 		{"delete_certfile_nif",      1, delete_certfile_nif},
 		{"get_certfile_nif",         1, get_certfile_nif},
+		{"clear_cache_nif",          0, clear_cache_nif},
                 {"invalidate_nif",           1, invalidate_nif}
         };
 
