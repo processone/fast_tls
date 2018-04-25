@@ -1,3 +1,8 @@
+# Version 1.0.22
+
+* Don't check mtime of certificates, and make cerificate update explicit
+* Add ability to specify CA for accepting client certificates
+
 # Version 1.0.21
 
 * Updating p1_utils to version 1.0.11.
