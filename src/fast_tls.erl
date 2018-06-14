@@ -32,7 +32,7 @@
 -export([open_nif/8, get_decrypted_input_nif/2,
 	 set_encrypted_input_nif/2, get_encrypted_output_nif/1,
 	 set_decrypted_output_nif/2, get_peer_certificate_nif/1,
-	 get_verify_result_nif/1, invalidate_nif/1]).
+	 get_verify_result_nif/1, invalidate_nif/1, get_negotiated_cipher_nif/1]).
 
 -export([start_link/0, tcp_to_tls/2,
 	 tls_to_tcp/1, send/2, recv/2, recv/3, recv_data/2,
@@ -41,7 +41,7 @@
 	 get_peer_certificate/1, get_peer_certificate/2,
 	 get_verify_result/1, get_cert_verify_string/2,
 	 add_certfile/2, get_certfile/1, delete_certfile/1,
-	 clear_cache/0]).
+	 clear_cache/0, get_negotiated_cipher/1]).
 
 %% Internal exports, call-back functions.
 -export([init/1, handle_call/3, handle_cast/2,
@@ -130,6 +130,9 @@ invalidate_nif(_Port) ->
 
 clear_cache_nif() ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+get_negotiated_cipher_nif(_Port) ->
+	erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 %%% --------------------------------------------------------
 %%% The call-back functions.
@@ -349,6 +352,15 @@ get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
 	    end;
 	{error, _} -> error
     end.
+
+-spec get_negotiated_cipher(tls_socket()) -> error | {ok, binary()}.
+get_negotiated_cipher(#tlssock{tlsport = Port}) ->
+		case catch get_negotiated_cipher_nif(Port) of
+			Val when is_binary(Val) ->
+				{ok, Val};
+			_ ->
+				error
+		end.
 
 -spec get_verify_result(tls_socket()) -> byte().
 

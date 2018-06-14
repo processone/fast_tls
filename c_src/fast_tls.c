@@ -1184,6 +1184,41 @@ static ERL_NIF_TERM invalidate_nif(ErlNifEnv *env, int argc,
     return enif_make_atom(env, "ok");
 }
 
+static ERL_NIF_TERM get_negotiated_cipher_nif(ErlNifEnv *env, int argc,
+                                              const ERL_NIF_TERM argv[]) {
+    state_t *state = NULL;
+
+    if (argc != 1)
+        return enif_make_badarg(env);
+
+    if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
+        return enif_make_badarg(env);
+
+    if (!state->mtx || !state->ssl) return enif_make_badarg(env);
+
+    enif_mutex_lock(state->mtx);
+
+    if (!state->valid) {
+        enif_mutex_unlock(state->mtx);
+        return ERR_T(enif_make_atom(env, "closed"));
+    }
+
+    const char *version = SSL_get_version(state->ssl);
+    const char *cipher = SSL_get_cipher_name(state->ssl);
+    enif_mutex_unlock(state->mtx);
+
+    ErlNifBinary bin;
+    size_t vl = strlen(version);
+    size_t cl = strlen(cipher);
+    if (!enif_alloc_binary(vl + cl + 1, &bin)) {
+        return ERR_T(enif_make_atom(env, "enomem"));
+    }
+    memcpy(bin.data, version, vl);
+    bin.data[vl] = ' ';
+    memcpy(bin.data + vl + 1, cipher, cl);
+    return enif_make_binary(env, &bin);
+}
+
 static ErlNifFunc nif_funcs[] =
         {
                 {"open_nif",                 8, open_nif},
@@ -1197,7 +1232,8 @@ static ErlNifFunc nif_funcs[] =
 		{"delete_certfile_nif",      1, delete_certfile_nif},
 		{"get_certfile_nif",         1, get_certfile_nif},
 		{"clear_cache_nif",          0, clear_cache_nif},
-                {"invalidate_nif",           1, invalidate_nif}
+                {"invalidate_nif",            1, invalidate_nif},
+                {"get_negotiated_cipher_nif", 1, get_negotiated_cipher_nif}
         };
 
 ERL_NIF_INIT(fast_tls, nif_funcs, load, NULL, NULL, unload)
