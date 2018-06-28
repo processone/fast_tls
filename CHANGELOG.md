@@ -1,5 +1,6 @@
 # Version 1.0.23
 
+* Updating p1_utils to version 1.0.12.
 * Add ability to get cipher user by connection
 
 # Version 1.0.22
