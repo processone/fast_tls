@@ -1,3 +1,7 @@
+# Version 1.0.23
+
+* Add ability to get cipher user by connection
+
 # Version 1.0.22
 
 * Don't check mtime of certificates, and make cerificate update explicit
