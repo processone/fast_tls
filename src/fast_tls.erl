@@ -508,12 +508,12 @@ transmission_test() ->
     LPid ! {stop, self()},
     receive
 	{received, Msg} ->
-	    ?assertEqual(Msg, <<"abcdefghi">>)
+	    ?assertEqual(<<"abcdefghi">>, Msg)
     end.
 
 not_compatible_protocol_options_test() ->
-    {LPid, Port} = setup_listener([{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2">>}]),
-    SPid = setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1|no_tlsv1_2">>}]),
+    {LPid, Port} = setup_listener([{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2|no_tlsv1_3">>}]),
+    SPid = setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1|no_tlsv1_2|no_tlsv1_3">>}]),
     SPid ! {stop, self()},
     receive
 	{result, Res} ->
@@ -521,8 +521,10 @@ not_compatible_protocol_options_test() ->
     end,
     LPid ! {stop, self()},
     receive
+	{received, {error, _, _} = Msg} ->
+	    ?assertMatch({error, _, <<>>}, Msg);
 	{received, Msg} ->
-	    ?assertEqual(Msg, <<>>)
+	    ?assertMatch(<<>>, Msg)
     end.
 
 setup_listener(Opts) ->
@@ -546,10 +548,15 @@ listener_loop(TLSSock, Msg) ->
 	    after 0 ->
 		listener_loop(TLSSock, Msg)
 	    end;
-	{error, _} ->
+	{error, closed} ->
 	    receive
 		{stop, Pid} ->
 		    Pid ! {received, Msg}
+	    end;
+	{error, Err} ->
+	    receive
+		{stop, Pid} ->
+		    Pid ! {received, {error, Err, Msg}}
 	    end;
 	{ok, Data} ->
 	    listener_loop(TLSSock, <<Msg/binary, Data/binary>>)
@@ -576,7 +583,9 @@ sender_loop(TLSSock) ->
 	      close(TLSSock),
 	      ok
 	  catch
-	      _:Err -> Err
+	      _:Err ->
+	      close(TLSSock),
+	      Err
 	  end,
     receive
 	{stop, Pid} ->
