@@ -69,6 +69,10 @@ typedef unsigned __int32 uint32_t;
 #define DH_set0_pqg(dh, dh_p, param, dh_g) (dh)->p = dh_p; (dh)->g = dh_g
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10200000L
+#define SSL_is_server(s) (s)->server
+#endif
+
 void __free(void *ptr, size_t size) {
     enif_free(ptr);
 }
