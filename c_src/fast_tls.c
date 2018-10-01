@@ -386,12 +386,14 @@ static int setup_dh(SSL_CTX *ctx, char *dh_file) {
 
 #endif
 
+#ifndef SSL_OP_NO_RENEGOTIATION
 static void ssl_info_callback(const SSL *s, int where, int ret) {
     state_t *d = (state_t *) SSL_get_ex_data(s, ssl_index);
     if ((where & SSL_CB_HANDSHAKE_START)) {
         d->handshakes++;
     }
 }
+#endif
 
 static char *create_ssl_for_cert(char *, state_t *);
 
@@ -553,7 +555,9 @@ static SSL_CTX *create_new_ctx(char *cert_file, char *ciphers,
 #endif
     SSL_CTX_set_verify(ctx, verifyopts, verify_callback);
 
+#ifndef SSL_OP_NO_RENEGOTIATION
     SSL_CTX_set_info_callback(ctx, &ssl_info_callback);
+#endif
 
     *err_str = NULL;
     return ctx;
@@ -762,6 +766,10 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
 
         SSL_set_connect_state(state->ssl);
     }
+
+#ifdef SSL_OP_NO_RENEGOTIATION
+    SSL_set_options(state->ssl, SSL_OP_NO_RENEGOTIATION);
+#endif
 
     ERL_NIF_TERM result = enif_make_resource(env, state);
     enif_release_resource(state);
