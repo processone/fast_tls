@@ -42,6 +42,7 @@ void ioqueue_consume(ioqueue *queue, size_t bytes) {
         memmove(queue->buf, queue->buf + bytes, queue->size);
     } else {
         free(queue->buf);
+        queue->buf = NULL;
         queue->capacity = 0;
     }
 }
