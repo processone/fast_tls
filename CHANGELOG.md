@@ -1,3 +1,10 @@
+# Version 1.1.0
+
+* Make more processing to c code side
+* Properly handle partial procesing in SSL_read/write
+* Make recv() with non-zero length return shorted result when there
+  is no connection error
+
 # Version 1.0.25
 
 * Updating p1_utils to version 1.0.13.
