@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include "options.h"
 #include "uthash.h"
+#include "ioqueue.h"
 
 #define BUF_SIZE 1024
 
@@ -40,12 +41,7 @@ typedef struct {
     int handshakes;
     ErlNifMutex *mtx;
     int valid;
-    char *send_buffer;
-    int send_buffer_size;
-    int send_buffer_len;
-    char *send_buffer2;
-    int send_buffer2_size;
-    int send_buffer2_len;
+    ioqueue *to_send_queue;
     char *cert_file;
     char *ciphers;
     char *dh_file;
@@ -163,6 +159,12 @@ static state_t *init_tls_state() {
         enif_release_resource(state);
         return NULL;
     }
+    state->to_send_queue = ioqueue_create();
+    if (!state->to_send_queue) {
+        enif_release_resource(state);
+        enif_mutex_destroy(state->mtx);
+        return NULL;
+    }
     state->valid = 1;
     return state;
 }
@@ -174,12 +176,10 @@ static void destroy_tls_state(ErlNifEnv *env, void *data) {
             SSL_free(state->ssl);
         if (state->mtx)
             enif_mutex_destroy(state->mtx);
-        if (state->send_buffer)
-            enif_free(state->send_buffer);
-        if (state->send_buffer2)
-            enif_free(state->send_buffer2);
         if (state->cert_file)
             enif_free(state->cert_file);
+        if (state->to_send_queue)
+            ioqueue_free(state->to_send_queue);
         memset(state, 0, sizeof(state_t));
     }
 }
@@ -457,7 +457,6 @@ static int ssl_sni_callback(const SSL *s, int *foo, void *data) {
 
 #define ERR_T(T) enif_make_tuple2(env, enif_make_atom(env, "error"), T)
 #define OK_T(T) enif_make_tuple2(env, enif_make_atom(env, "ok"), T)
-#define SEND_T(T) enif_make_tuple2(env, enif_make_atom(env, "send"), T)
 
 #define SET_CERTIFICATE_FILE_ACCEPT 1
 #define SET_CERTIFICATE_FILE_CONNECT 2
@@ -776,112 +775,158 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     return OK_T(result);
 }
 
-static ERL_NIF_TERM set_encrypted_input_nif(ErlNifEnv *env, int argc,
-                                            const ERL_NIF_TERM argv[]) {
-    state_t *state = NULL;
-    ErlNifBinary input;
+static ERL_NIF_TERM
+get_data_to_write(ErlNifEnv *env, state_t* state) {
+    ERL_NIF_TERM data;
+    size_t size = BIO_ctrl_pending(state->bio_write);
 
-    if (argc != 2)
-        return enif_make_badarg(env);
+    unsigned char *buf = enif_make_new_binary(env, size, &data);
+    BIO_read(state->bio_write, buf, (int)size);
 
-    if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
-        return enif_make_badarg(env);
-
-    if (!enif_inspect_iolist_as_binary(env, argv[1], &input))
-        return enif_make_badarg(env);
-
-    if (!state->mtx || !state->ssl) return enif_make_badarg(env);
-    enif_mutex_lock(state->mtx);
-
-    if (!state->valid) {
-        enif_mutex_unlock(state->mtx);
-        return ERR_T(enif_make_atom(env, "closed"));
-    }
-
-    BIO_write(state->bio_read, input.data, input.size);
-    enif_mutex_unlock(state->mtx);
-
-    return enif_make_atom(env, "ok");
+    return data;
 }
 
-static ERL_NIF_TERM set_decrypted_output_nif(ErlNifEnv *env, int argc,
-                                             const ERL_NIF_TERM argv[]) {
-    state_t *state = NULL;
+static int
+get_decrypted_data(ErlNifEnv *env, state_t* state, int bytes_to_read, ERL_NIF_TERM *ret) {
+    ErlNifBinary buf;
+    size_t pos = 0;
     int res;
-    ErlNifBinary input;
 
-    if (argc != 2)
-        return enif_make_badarg(env);
-
-    if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
-        return enif_make_badarg(env);
-
-    if (!enif_inspect_iolist_as_binary(env, argv[1], &input))
-        return enif_make_badarg(env);
-
-    if (!state->mtx || !state->ssl) return enif_make_badarg(env);
-    enif_mutex_lock(state->mtx);
-
-    if (!state->valid) {
-        enif_mutex_unlock(state->mtx);
-        return ERR_T(enif_make_atom(env, "closed"));
+    if (bytes_to_read == 0) {
+        enif_make_new_binary(env, 0, ret);
+        return 1;
     }
 
-    if (input.size > 0) {
-        ERR_clear_error();
+    if (bytes_to_read < 0 || bytes_to_read > BUF_SIZE) {
+        res = enif_alloc_binary(BUF_SIZE, &buf);
+    } else {
+        res = enif_alloc_binary((size_t)bytes_to_read, &buf);
+    }
 
-        if (state->send_buffer != NULL) {
-            if (state->send_buffer2 == NULL) {
-                state->send_buffer2_len = input.size;
-                state->send_buffer2_size = input.size;
-                state->send_buffer2 = enif_alloc(state->send_buffer2_size);
-                memcpy(state->send_buffer2, input.data, input.size);
-            } else {
-                if (state->send_buffer2_size <
-                    state->send_buffer2_len + input.size) {
-                    while (state->send_buffer2_size <
-                           state->send_buffer2_len + input.size) {
-                        state->send_buffer2_size *= 2;
-                    }
-                    state->send_buffer2 = enif_realloc(state->send_buffer2, state->send_buffer2_size);
-                }
-                memcpy(state->send_buffer2 + state->send_buffer2_len, input.data, input.size);
-                state->send_buffer2_len += input.size;
+    if (!res) {
+        *ret = ERR_T(enif_make_atom(env, "enomem"));
+        return 2;
+    }
+
+    while ((res = SSL_read(state->ssl, buf.data + pos, (int)(buf.size - pos))) > 0) {
+        pos += res;
+        if (pos == bytes_to_read)
+            break;
+        if (buf.size - pos < BUF_SIZE && buf.size != bytes_to_read) {
+            size_t new_size = bytes_to_read > 0 && buf.size * 2 > bytes_to_read ?
+                    bytes_to_read : buf.size * 2;
+            if (!enif_realloc_binary(&buf, new_size)) {
+                *ret = ERR_T(enif_make_atom(env, "enomem"));
+                return 2;
             }
-        } else {
-            res = SSL_write(state->ssl, input.data, input.size);
-            if (res <= 0) {
-                res = SSL_get_error(state->ssl, res);
-                if (res == SSL_ERROR_WANT_READ || res == SSL_ERROR_WANT_WRITE) {
-                    state->send_buffer_len = input.size;
-                    state->send_buffer_size = input.size;
-                    state->send_buffer = enif_alloc(state->send_buffer_size);
-                    memcpy(state->send_buffer, input.data, input.size);
-                } else {
-                    enif_mutex_unlock(state->mtx);
-                    return ssl_error(env, "SSL_write failed");
-                }
+        }
+    }
+    enif_realloc_binary(&buf, pos);
+    *ret = enif_make_binary(env, &buf);
+    return 1;
+}
+
+static ERL_NIF_TERM
+return_read_write(ErlNifEnv *env, state_t* state, int bytes_to_read) {
+    ERL_NIF_TERM read;
+    if (get_decrypted_data(env, state, bytes_to_read, &read) == 2) {
+        enif_mutex_unlock(state->mtx);
+        return read;
+    }
+    ERL_NIF_TERM write = get_data_to_write(env, state);
+
+    enif_mutex_unlock(state->mtx);
+
+    return enif_make_tuple2(env, write, read);
+}
+
+static int
+do_recv(ErlNifEnv *env, state_t *state, ERL_NIF_TERM *err, ErlNifBinary *recv) {
+    int res;
+
+    if (recv->size == 0)
+        return 1;
+
+    res = BIO_write(state->bio_read, recv->data, (int)recv->size);
+    if (res <= 0) {
+        enif_mutex_unlock(state->mtx);
+        *err = ERR_T(enif_make_atom(env, "write_failed"));
+        return 2;
+    }
+    return 1;
+}
+
+static int
+do_send(ErlNifEnv *env, state_t *state, ERL_NIF_TERM *err, ErlNifBinary *to_send) {
+    int res = 1;
+
+    if (state->to_send_queue->size > 0) {
+        res = SSL_write(state->ssl, state->to_send_queue->buf,
+                        (int) state->to_send_queue->size);
+        if (res > 0) {
+            ioqueue_consume(state->to_send_queue, (size_t) res);
+        }
+    }
+    if (to_send->size) {
+        int consumed = 0;
+        if (res > 0 && state->to_send_queue->size == 0) {
+            res = SSL_write(state->ssl, to_send->data, (int) to_send->size);
+            consumed = res > 0 ? res : 0;
+        }
+        if (consumed < to_send->size) {
+            if (!ioqueue_append(state->to_send_queue, (char *) to_send->data + consumed,
+                                to_send->size - consumed)) {
+                enif_mutex_unlock(state->mtx);
+                *err = ERR_T(enif_make_atom(env, "enomem"));
+                return 2;
             }
         }
     }
 
-    enif_mutex_unlock(state->mtx);
-    return enif_make_atom(env, "ok");
+    return res > 0 ? 1 : res;
 }
 
-static ERL_NIF_TERM get_encrypted_output_nif(ErlNifEnv *env, int argc,
-                                             const ERL_NIF_TERM argv[]) {
-    state_t *state = NULL;
-    size_t size;
-    ErlNifBinary output;
+static int
+do_send_queue(ErlNifEnv *env, state_t *state, ERL_NIF_TERM *err, ErlNifBinary *to_send) {
+    int res = 1;
 
-    if (argc != 1)
+    if (to_send->size) {
+        if (!ioqueue_append(state->to_send_queue, (char *) to_send->data,
+                            to_send->size)) {
+            enif_mutex_unlock(state->mtx);
+            *err = ERR_T(enif_make_atom(env, "enomem"));
+            return 2;
+        }
+    }
+
+    return res > 0 ? 1 : res;
+}
+
+static ERL_NIF_TERM
+loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    state_t *state = NULL;
+    ErlNifBinary to_send;
+    ErlNifBinary received;
+    int bytes_to_read;
+
+    if (argc != 4)
         return enif_make_badarg(env);
 
     if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
         return enif_make_badarg(env);
 
-    if (!state->mtx || !state->ssl) return enif_make_badarg(env);
+    if (!enif_inspect_iolist_as_binary(env, argv[1], &to_send))
+        return enif_make_badarg(env);
+
+    if (!enif_inspect_iolist_as_binary(env, argv[2], &received))
+        return enif_make_badarg(env);
+
+    if (!enif_get_int(env, argv[3], &bytes_to_read))
+        return enif_make_badarg(env);
+
+    if (!state->mtx || !state->ssl)
+        return enif_make_badarg(env);
+
     enif_mutex_lock(state->mtx);
 
     if (!state->valid) {
@@ -891,14 +936,57 @@ static ERL_NIF_TERM get_encrypted_output_nif(ErlNifEnv *env, int argc,
 
     ERR_clear_error();
 
-    size = BIO_ctrl_pending(state->bio_write);
-    if (!enif_alloc_binary(size, &output)) {
-        enif_mutex_unlock(state->mtx);
-        return ERR_T(enif_make_atom(env, "enomem"));
+    int res;
+    ERL_NIF_TERM err_term;
+
+    res = do_recv(env, state, &err_term, &received);
+    if (res == 2) {
+        return err_term;
     }
-    BIO_read(state->bio_write, output.data, size);
-    enif_mutex_unlock(state->mtx);
-    return OK_T(enif_make_binary(env, &output));
+
+    if (!SSL_is_init_finished(state->ssl)) {
+        res = SSL_do_handshake(state->ssl);
+        if (res <= 0) {
+            res = SSL_get_error(state->ssl, res);
+            if (res == SSL_ERROR_WANT_READ || res == SSL_ERROR_WANT_WRITE) {
+                res = do_send_queue(env, state, &err_term, &to_send);
+                if (res == 2) {
+                    return err_term;
+                }
+                return return_read_write(env, state, bytes_to_read);
+            } else {
+                enif_mutex_unlock(state->mtx);
+                int reason = ERR_GET_REASON(ERR_peek_error());
+                if (reason == SSL_R_DATA_LENGTH_TOO_LONG ||
+                    reason == SSL_R_PACKET_LENGTH_TOO_LONG ||
+                    reason == SSL_R_UNKNOWN_PROTOCOL ||
+                    reason == SSL_R_UNEXPECTED_MESSAGE ||
+                    reason == SSL_R_WRONG_VERSION_NUMBER)
+                    /* Do not report badly formed Client Hello */
+                    return ERR_T(enif_make_atom(env, "closed"));
+                else if (state->sni_error)
+                    return ssl_error(env, state->sni_error);
+                else
+                    return ssl_error(env, "SSL_do_handshake failed");
+            }
+        }
+        if (!SSL_is_init_finished(state->ssl)) {
+            res = do_send_queue(env, state, &err_term, &to_send);
+            if (res == 2) {
+                return err_term;
+            }
+            return return_read_write(env, state, bytes_to_read);
+        }
+    }
+
+    res = do_send(env, state, &err_term, &to_send);
+    if (res == 2) {
+        return err_term;
+    }
+
+    if (res <= 0)
+        res = SSL_get_error(state->ssl, res);
+    return return_read_write(env, state, bytes_to_read);
 }
 
 static ERL_NIF_TERM get_verify_result_nif(ErlNifEnv *env, int argc,
@@ -969,118 +1057,6 @@ static ERL_NIF_TERM get_peer_certificate_nif(ErlNifEnv *env, int argc,
         enif_mutex_unlock(state->mtx);
         return ERR_T(enif_make_atom(env, "notfound"));
     }
-}
-
-static ERL_NIF_TERM get_decrypted_input_nif(ErlNifEnv *env, int argc,
-                                            const ERL_NIF_TERM argv[]) {
-    state_t *state = NULL;
-    size_t rlen, size;
-    int res;
-    unsigned int req_size = 0;
-    ErlNifBinary output;
-    int retcode = 0;
-
-    if (argc != 2)
-        return enif_make_badarg(env);
-
-    if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
-        return enif_make_badarg(env);
-
-    if (!enif_get_uint(env, argv[1], &req_size))
-        return enif_make_badarg(env);
-
-    if (!state->mtx || !state->ssl) return enif_make_badarg(env);
-    enif_mutex_lock(state->mtx);
-
-    if (!state->valid) {
-        enif_mutex_unlock(state->mtx);
-        return ERR_T(enif_make_atom(env, "closed"));
-    }
-
-    ERR_clear_error();
-
-    if (!SSL_is_init_finished(state->ssl)) {
-        retcode = 2;
-        res = SSL_do_handshake(state->ssl);
-        if (res <= 0) {
-            if (SSL_get_error(state->ssl, res) != SSL_ERROR_WANT_READ) {
-                enif_mutex_unlock(state->mtx);
-                int reason = ERR_GET_REASON(ERR_peek_error());
-                if (reason == SSL_R_DATA_LENGTH_TOO_LONG ||
-                    reason == SSL_R_PACKET_LENGTH_TOO_LONG ||
-                    reason == SSL_R_UNKNOWN_PROTOCOL ||
-                    reason == SSL_R_UNEXPECTED_MESSAGE ||
-                    reason == SSL_R_WRONG_VERSION_NUMBER)
-                    /* Do not report badly formed Client Hello */
-                    return ERR_T(enif_make_atom(env, "closed"));
-                else if (state->sni_error)
-                    return ssl_error(env, state->sni_error);
-                else
-                    return ssl_error(env, "SSL_do_handshake failed");
-            }
-        }
-    }
-    if (SSL_is_init_finished(state->ssl)) {
-        int i;
-        for (i = 0; i < 2; i++)
-            if (state->send_buffer != NULL) {
-                res = SSL_write(state->ssl, state->send_buffer, state->send_buffer_len);
-                if (res <= 0) {
-                    char *error = "SSL_write failed";
-                    enif_mutex_unlock(state->mtx);
-                    return ERR_T(enif_make_string(env, error, ERL_NIF_LATIN1));
-                }
-                retcode = 2;
-                enif_free(state->send_buffer);
-                state->send_buffer = state->send_buffer2;
-                state->send_buffer_len = state->send_buffer2_len;
-                state->send_buffer_size = state->send_buffer2_size;
-                state->send_buffer2 = NULL;
-                state->send_buffer2_len = 0;
-                state->send_buffer2_size = 0;
-            }
-        size = BUF_SIZE;
-        rlen = 0;
-        enif_alloc_binary(size, &output);
-        res = 0;
-        while ((req_size == 0 || rlen < req_size) &&
-               (res = SSL_read(state->ssl,
-                               output.data + rlen,
-                               (req_size == 0 || req_size >= size) ?
-                               size - rlen : req_size - rlen)) > 0) {
-            //printf("%d bytes of decrypted data read from state machine\r\n",res);
-            rlen += res;
-            if (size - rlen < BUF_SIZE) {
-                size *= 2;
-                enif_realloc_binary(&output, size);
-            }
-        }
-
-        if (state->handshakes > 1 && SSL_is_server(state->ssl) &&
-            !SSL_get_secure_renegotiation_support(state->ssl)) {
-            enif_release_binary(&output);
-            char *error = "client renegotiations forbidden";
-            enif_mutex_unlock(state->mtx);
-            return ERR_T(enif_make_string(env, error, ERL_NIF_LATIN1));
-        }
-
-        if (res < 0) {
-            int error = SSL_get_error(state->ssl, res);
-
-            if (error == SSL_ERROR_WANT_READ) {
-                //printf("SSL_read wants more data\r\n");
-                //return 0;
-            }
-            // TODO
-        }
-        enif_realloc_binary(&output, rlen);
-    } else {
-        retcode = 2;
-        enif_alloc_binary(0, &output);
-    }
-    enif_mutex_unlock(state->mtx);
-    return retcode == 0 ? OK_T(enif_make_binary(env, &output))
-                        : SEND_T(enif_make_binary(env, &output));
 }
 
 static ERL_NIF_TERM add_certfile_nif(ErlNifEnv *env, int argc,
@@ -1232,10 +1208,7 @@ static ERL_NIF_TERM get_negotiated_cipher_nif(ErlNifEnv *env, int argc,
 static ErlNifFunc nif_funcs[] =
         {
                 {"open_nif",                  8, open_nif},
-                {"set_encrypted_input_nif",   2, set_encrypted_input_nif},
-                {"set_decrypted_output_nif",  2, set_decrypted_output_nif},
-                {"get_decrypted_input_nif",   2, get_decrypted_input_nif},
-                {"get_encrypted_output_nif",  1, get_encrypted_output_nif},
+                {"loop_nif",                  4, loop_nif},
                 {"get_verify_result_nif",     1, get_verify_result_nif},
                 {"get_peer_certificate_nif",  1, get_peer_certificate_nif},
                 {"add_certfile_nif",          2, add_certfile_nif},
