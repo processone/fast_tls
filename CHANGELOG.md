@@ -1,5 +1,6 @@
 # Version 1.1.0
 
+* Updating p1_utils to version 1.0.14.
 * Add contribution guide
 * Make more processing to c code side
 * Properly handle partial procesing in SSL_read/write
