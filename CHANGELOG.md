@@ -1,5 +1,6 @@
 # Version 1.1.0
 
+* Add contribution guide
 * Make more processing to c code side
 * Properly handle partial procesing in SSL_read/write
 * Make recv() with non-zero length return shorted result when there
