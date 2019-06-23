@@ -466,14 +466,19 @@ static int ssl_sni_callback(const SSL *s, int *foo, void *data) {
 static ERL_NIF_TERM ssl_error(ErlNifEnv *env, const char *errstr) {
     size_t rlen;
     ErlNifBinary err;
+    char error_string[256];
+    size_t error_string_length;
     size_t errstrlen = strlen(errstr);
     unsigned long error_code = ERR_get_error();
-    char *error_string = error_code ? ERR_error_string(error_code, NULL) : NULL;
-    size_t error_string_length = error_string ? strlen(error_string) : 0;
-    if (error_code)
+
+    if (error_code) {
+        ERR_error_string_n(error_code, error_string, sizeof(error_string));
+        error_string_length = strlen(error_string),
         rlen = errstrlen + error_string_length + 2;
-    else
+    } else {
+        error_string_length = 0;
         rlen = errstrlen;
+    }
     enif_alloc_binary(rlen, &err);
     memcpy(err.data, errstr, errstrlen);
     if (error_code) {
