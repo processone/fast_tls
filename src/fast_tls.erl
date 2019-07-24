@@ -78,7 +78,7 @@
 
 -type tls_socket() :: #tlssock{}.
 
--type cert() :: any(). %% TODO
+-type cert() :: #'Certificate'{} | #'OTPCertificate'{}.
 
 -export_type([tls_socket/0]).
 
@@ -321,15 +321,18 @@ close(#tlssock{tcpsock = TCPSocket, tlsport = Port}) ->
     invalidate_nif(Port),
     gen_tcp:close(TCPSocket).
 
--spec get_peer_certificate(tls_socket()) -> error | {ok, cert()}.
+-spec get_peer_certificate(tls_socket()) -> {ok, cert()} | error.
 get_peer_certificate(TLSSock) ->
     get_peer_certificate(TLSSock, plain).
 
--spec get_peer_certificate(tls_socket(), otp|plain) -> error | {ok, cert()}.
+-spec get_peer_certificate(tls_socket(), otp|plain) -> {ok, cert()} | error;
+			  (tls_socket(), der) -> {ok, binary()} | error.
 get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
     case catch get_peer_certificate_nif(Port) of
         {'EXIT', {badarg, _}} ->
             error;
+	{ok, BCert} when Type == der ->
+	    {ok, BCert};
         {ok, BCert} ->
             try public_key:pkix_decode_cert(BCert, Type) of
                 Cert -> {ok, Cert}
@@ -354,18 +357,15 @@ get_verify_result(#tlssock{tlsport = Port}) ->
     {ok, Res} = get_verify_result_nif(Port),
     Res.
 
--spec get_cert_verify_string(number(), cert()) -> binary().
-
+-spec get_cert_verify_string(number(), cert() | binary()) -> binary().
 get_cert_verify_string(CertVerifyRes, Cert) ->
-    case catch cert_is_self_signed(Cert) of
-        {'EXIT', _} -> <<"unknown verification error">>;
-        IsSelfsigned ->
-            case {CertVerifyRes, IsSelfsigned} of
-                {21, true} -> <<"self-signed certificate">>;
-                _ -> cert_verify_code(CertVerifyRes)
-            end
+    IsSelfsigned = cert_is_self_signed(Cert),
+    case {CertVerifyRes, IsSelfsigned} of
+	{21, true} -> <<"self-signed certificate">>;
+	_ -> cert_verify_code(CertVerifyRes)
     end.
 
+-spec cert_is_self_signed(cert() | binary()) -> boolean().
 cert_is_self_signed(#'Certificate'{} = Cert) ->
     BCert = public_key:pkix_encode('Certificate', Cert, plain),
     cert_is_self_signed(BCert);
