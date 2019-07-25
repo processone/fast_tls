@@ -184,6 +184,8 @@ static void destroy_tls_state(ErlNifEnv *env, void *data) {
     }
 }
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
+
 static void locking_callback(int mode, int n, const char *file, int line) {
     if (mode & CRYPTO_LOCK)
         enif_mutex_lock(mtx_buf[n]);
@@ -198,6 +200,8 @@ static void thread_id_callback(CRYPTO_THREADID *id) {
 static int atomic_add_callback(int *pointer, int amount, int type, const char *file, int line) {
     return __sync_add_and_fetch(pointer, amount);
 }
+
+#endif
 
 static int load(ErlNifEnv *env, void **priv, ERL_NIF_TERM load_info) {
     int i;
