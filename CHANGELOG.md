@@ -1,3 +1,9 @@
+# Version 1.1.2
+
+* Remove warnings about unused functions on openssl 1.1
+* Make it possible to get DER-encoded certificate
+* Use thread-safe function to retrieve error reason
+
 # Version 1.1.1
 
 * Updating p1_utils to version 1.0.15.
