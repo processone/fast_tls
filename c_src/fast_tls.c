@@ -970,7 +970,9 @@ loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
                     reason == SSL_R_PACKET_LENGTH_TOO_LONG ||
                     reason == SSL_R_UNKNOWN_PROTOCOL ||
                     reason == SSL_R_UNEXPECTED_MESSAGE ||
-                    reason == SSL_R_WRONG_VERSION_NUMBER)
+                    reason == SSL_R_WRONG_VERSION_NUMBER ||
+		    reason == SSL_R_HTTP_REQUEST ||
+		    reason == SSL_R_HTTPS_PROXY_REQUEST)
                     /* Do not report badly formed Client Hello */
                     return ERR_T(enif_make_atom(env, "closed"));
                 else if (state->sni_error)
