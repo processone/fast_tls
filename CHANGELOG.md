@@ -1,3 +1,7 @@
+# Version 1.1.3
+
+* Do not report several other badly formed hello packets
+
 # Version 1.1.2
 
 * Updating p1_utils to version 1.0.16.
