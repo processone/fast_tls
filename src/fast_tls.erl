@@ -37,7 +37,8 @@
          get_peer_certificate/1, get_peer_certificate/2,
          get_verify_result/1, get_cert_verify_string/2,
          add_certfile/2, get_certfile/1, delete_certfile/1,
-         clear_cache/0, get_negotiated_cipher/1]).
+         clear_cache/0, get_negotiated_cipher/1,
+         get_tls_last_message/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -103,6 +104,12 @@ clear_cache_nif() ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 get_negotiated_cipher_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+tls_get_peer_finished_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+tls_get_finished_nif(_Port) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 %%% --------------------------------------------------------
@@ -308,8 +315,13 @@ get_negotiated_cipher(#tlssock{tlsport = Port}) ->
             error
     end.
 
--spec get_verify_result(tls_socket()) -> byte().
+-spec get_tls_last_message(peer | self, tls_socket()) -> binary().
+get_tls_last_message(peer, #tlssock{tlsport = Port}) ->
+    tls_get_peer_finished_nif(Port);
+get_tls_last_message(self, #tlssock{tlsport = Port}) ->
+    tls_get_finished_nif(Port).
 
+-spec get_verify_result(tls_socket()) -> byte().
 get_verify_result(#tlssock{tlsport = Port}) ->
     {ok, Res} = get_verify_result_nif(Port),
     Res.

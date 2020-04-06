@@ -1216,6 +1216,45 @@ static ERL_NIF_TERM get_negotiated_cipher_nif(ErlNifEnv *env, int argc,
     return enif_make_binary(env, &bin);
 }
 
+static ERL_NIF_TERM tls_get_peer_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    state_t *state = NULL;
+    if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
+        return enif_make_badarg(env);
+
+    ErlNifBinary    bin;
+	/*
+	 * OpenSSL does not offer an API to directly get the length of the
+	 * expected TLS Finished message, so just do a dummy call to grab this
+	 * information to allow caller to do an allocation with a correct size.
+	 */
+    size_t len = SSL_get_peer_finished(state->ssl, NULL, 0);
+    if(!enif_alloc_binary(len, &bin))
+        return ERR_T(enif_make_atom(env, "enomem"));
+
+	(void) SSL_get_peer_finished(state->ssl, bin.data, len);
+    if (!bin.data)
+        return ERR_T(enif_make_atom(env, "enomem"));
+
+    return enif_make_binary(env, &bin);
+}
+
+static ERL_NIF_TERM tls_get_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    state_t *state = NULL;
+    if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
+        return enif_make_badarg(env);
+
+    ErlNifBinary    bin;
+    size_t len = SSL_get_finished(state->ssl, NULL, 0);
+    if(!enif_alloc_binary(len, &bin))
+        return ERR_T(enif_make_atom(env, "enomem"));
+
+	(void) SSL_get_finished(state->ssl, bin.data, len);
+    if (!bin.data)
+        return ERR_T(enif_make_atom(env, "enomem"));
+
+    return enif_make_binary(env, &bin);
+}
+
 static ErlNifFunc nif_funcs[] =
         {
                 {"open_nif",                  8, open_nif},
@@ -1227,7 +1266,9 @@ static ErlNifFunc nif_funcs[] =
                 {"get_certfile_nif",          1, get_certfile_nif},
                 {"clear_cache_nif",           0, clear_cache_nif},
                 {"invalidate_nif",            1, invalidate_nif},
-                {"get_negotiated_cipher_nif", 1, get_negotiated_cipher_nif}
+                {"get_negotiated_cipher_nif", 1, get_negotiated_cipher_nif},
+                {"tls_get_peer_finished_nif", 1, tls_get_peer_finished_nif},
+                {"tls_get_finished_nif",      1, tls_get_finished_nif}
         };
 
 ERL_NIF_INIT(fast_tls, nif_funcs, load, NULL, NULL, unload)
