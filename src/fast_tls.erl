@@ -473,15 +473,18 @@ transmission_test_with_opts(ListenerOpts, SenderOpts) ->
     {LPid, Port} = setup_listener(ListenerOpts),
     SPid = setup_sender(Port, SenderOpts),
     SPid ! {stop, self()},
-    receive
-        {result, Res} ->
-            ?assertEqual(ok, Res)
-    end,
+    FC = receive
+             {result, Res, FinishedFromClient} ->
+                 ?assertEqual(ok, Res),
+                 FinishedFromClient
+         end,
     LPid ! {stop, self()},
-    receive
-        {received, Msg} ->
-            ?assertEqual(<<"abcdefghi">>, Msg)
-    end,
+    FL = receive
+             {received, Msg, FinishedFromListener} ->
+                 ?assertEqual(<<"abcdefghi">>, Msg),
+                 FinishedFromListener
+         end,
+    ?assertEqual(FC, FL),
     receive
         {certfile, Cert} ->
             case lists:keymember(certfile, 1, SenderOpts) of
@@ -495,14 +498,14 @@ not_compatible_protocol_options_test() ->
     SPid = setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1|no_tlsv1_2|no_tlsv1_3">>}]),
     SPid ! {stop, self()},
     receive
-        {result, Res} ->
+        {result, Res, _} ->
             ?assertMatch({badmatch, {error, _}}, Res)
     end,
     LPid ! {stop, self()},
     receive
-        {received, {error, _, _} = Msg} ->
+        {received, {error, _, _} = Msg, _} ->
             ?assertMatch({error, _, <<>>}, Msg);
-        {received, Msg} ->
+        {received, Msg, _} ->
             ?assertMatch(<<>>, Msg)
     end.
 
@@ -519,11 +522,12 @@ setup_listener(Opts) ->
     {Pid, Port}.
 
 listener_loop(TLSSock, Msg) ->
+    Finished = get_tls_last_message(peer, TLSSock),
     case recv(TLSSock, 1, 1000) of
         {error, timeout} ->
             receive
                 {stop, Pid} ->
-                    Pid ! {received, Msg},
+                    Pid ! {received, Msg, Finished},
                     Cert = get_peer_certificate(TLSSock),
                     Pid ! {certfile, Cert}
             after 0 ->
@@ -532,14 +536,14 @@ listener_loop(TLSSock, Msg) ->
         {error, closed} ->
             receive
                 {stop, Pid} ->
-                    Pid ! {received, Msg},
+                    Pid ! {received, Msg, Finished},
                     Cert = get_peer_certificate(TLSSock),
                     Pid ! {certfile, Cert}
             end;
         {error, Err} ->
             receive
                 {stop, Pid} ->
-                    Pid ! {received, {error, Err, Msg}}
+                    Pid ! {received, {error, Err, Msg}, Finished}
             end;
         {ok, Data} ->
             listener_loop(TLSSock, <<Msg/binary, Data/binary>>)
@@ -555,8 +559,9 @@ setup_sender(Port, Opts) ->
           end).
 
 sender_loop(TLSSock) ->
-    Res = try
+    {Res, Finished} = try
               recv(TLSSock, 0, 100),
+              F = get_tls_last_message(self, TLSSock),
               ok = send(TLSSock, <<"abc">>),
               recv(TLSSock, 0, 100),
               ok = send(TLSSock, <<"def">>),
@@ -564,15 +569,15 @@ sender_loop(TLSSock) ->
               ok = send(TLSSock, <<"ghi">>),
               recv(TLSSock, 0, 100),
               close(TLSSock),
-              ok
+              {ok, F}
           catch
               _:Err ->
                   close(TLSSock),
-                  Err
+                  {Err, <<>>}
           end,
     receive
         {stop, Pid} ->
-            Pid ! {result, Res}
+            Pid ! {result, Res, Finished}
     end.
 
 certificate() ->
