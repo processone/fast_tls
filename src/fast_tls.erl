@@ -153,7 +153,7 @@ tcp_to_tls(TCPSocket, Options) ->
                   false -> ?SET_CERTIFICATE_FILE_ACCEPT
               end,
     CertFile = proplists:get_value(certfile, Options, ""),
-    if CertFile /= [] orelse Command == ?SET_CERTIFICATE_FILE_ACCEPT ->
+    if CertFile /= [] orelse Command == ?SET_CERTIFICATE_FILE_CONNECT ->
         Flags1 = case lists:member(verify_none, Options) of
                      true -> ?VERIFY_NONE;
                      false -> 0
