@@ -483,9 +483,15 @@ load_nif_test() ->
     SOPath = p1_nif_utils:get_so_path(fast_tls, [], "fast_tls"),
     ?assertEqual(ok, load_nif(SOPath)).
 
-transmission_test() ->
-    {LPid, Port} = setup_listener([]),
-    SPid = setup_sender(Port, []),
+transmission_with_client_certificate_test() ->
+    transmission_test_with_opts([], [{certfile, <<"../tests/cert.pem">>}]).
+
+transmission_without_client_certificate_test() ->
+    transmission_test_with_opts([], []).
+
+transmission_test_with_opts(ListenerOpts, SenderOpts) ->
+    {LPid, Port} = setup_listener(ListenerOpts),
+    SPid = setup_sender(Port, SenderOpts),
     SPid ! {stop, self()},
     receive
         {result, Res} ->
@@ -553,7 +559,7 @@ setup_sender(Port, Opts) ->
         binary, {packet, 0}, {active, false},
         {reuseaddr, true}, {nodelay, true}]),
     spawn(fun() ->
-        {ok, TLSSock} = tcp_to_tls(Socket, [connect, {certfile, <<"../tests/cert.pem">>} | Opts]),
+        {ok, TLSSock} = tcp_to_tls(Socket, [connect | Opts]),
         sender_loop(TLSSock)
           end).
 
