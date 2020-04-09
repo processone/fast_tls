@@ -501,6 +501,13 @@ transmission_test_with_opts(ListenerOpts, SenderOpts) ->
     receive
         {received, Msg} ->
             ?assertEqual(<<"abcdefghi">>, Msg)
+    end,
+    receive
+        {certfile, Cert} ->
+            case lists:keymember(certfile, 1, SenderOpts) of
+                true -> ?assertNotEqual(error, Cert);
+                false -> ?assertEqual(error, Cert)
+            end
     end.
 
 not_compatible_protocol_options_test() ->
@@ -536,14 +543,18 @@ listener_loop(TLSSock, Msg) ->
         {error, timeout} ->
             receive
                 {stop, Pid} ->
-                    Pid ! {received, Msg}
+                    Pid ! {received, Msg},
+                    Cert = get_peer_certificate(TLSSock),
+                    Pid ! {certfile, Cert}
             after 0 ->
                 listener_loop(TLSSock, Msg)
             end;
         {error, closed} ->
             receive
                 {stop, Pid} ->
-                    Pid ! {received, Msg}
+                    Pid ! {received, Msg},
+                    Cert = get_peer_certificate(TLSSock),
+                    Pid ! {certfile, Cert}
             end;
         {error, Err} ->
             receive
