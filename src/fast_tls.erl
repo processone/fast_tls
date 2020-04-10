@@ -484,10 +484,10 @@ load_nif_test() ->
     ?assertEqual(ok, load_nif(SOPath)).
 
 transmission_with_client_certificate_test() ->
-    transmission_test_with_opts([], [{certfile, <<"../tests/cert.pem">>}]).
+    transmission_test_with_opts([certificate()], [certificate()]).
 
 transmission_without_client_certificate_test() ->
-    transmission_test_with_opts([], []).
+    transmission_test_with_opts([certificate()], []).
 
 transmission_test_with_opts(ListenerOpts, SenderOpts) ->
     {LPid, Port} = setup_listener(ListenerOpts),
@@ -511,7 +511,7 @@ transmission_test_with_opts(ListenerOpts, SenderOpts) ->
     end.
 
 not_compatible_protocol_options_test() ->
-    {LPid, Port} = setup_listener([{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2|no_tlsv1_3">>}]),
+    {LPid, Port} = setup_listener([certificate(), {protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1_1|no_tlsv1_2|no_tlsv1_3">>}]),
     SPid = setup_sender(Port, [{protocol_options, <<"no_sslv2|no_sslv3|no_tlsv1|no_tlsv1_2|no_tlsv1_3">>}]),
     SPid ! {stop, self()},
     receive
@@ -532,7 +532,7 @@ setup_listener(Opts) ->
                                          {reuseaddr, true}, {nodelay, true}]),
     Pid = spawn(fun() ->
         {ok, Socket} = gen_tcp:accept(ListenSocket),
-        {ok, TLSSock} = tcp_to_tls(Socket, [{certfile, <<"../tests/cert.pem">>} | Opts]),
+        {ok, TLSSock} = tcp_to_tls(Socket, Opts),
         listener_loop(TLSSock, <<>>)
                 end),
     {ok, Port} = inet:port(ListenSocket),
@@ -594,5 +594,8 @@ sender_loop(TLSSock) ->
         {stop, Pid} ->
             Pid ! {result, Res}
     end.
+
+certificate() ->
+    {certfile, <<"../tests/cert.pem">>}.
 
 -endif.
