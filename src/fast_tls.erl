@@ -25,8 +25,6 @@
 
 -author('alexey@process-one.net').
 
--compile({no_auto_import, [{integer_to_binary, 1}]}).
-
 -behaviour(gen_server).
 
 -export([open_nif/8, loop_nif/4, get_peer_certificate_nif/1,
@@ -454,9 +452,6 @@ cert_verify_code(50) ->
     <<"application verification failure">>;
 cert_verify_code(X) ->
     <<"Unknown OpenSSL error code: ", (integer_to_binary(X))/binary>>.
-
-integer_to_binary(I) ->
-    list_to_binary(integer_to_list(I)).
 
 encode_alpn(ProtoList) ->
     [<<(size(Proto)), Proto/binary>> || Proto <- ProtoList, Proto /= <<>>].
