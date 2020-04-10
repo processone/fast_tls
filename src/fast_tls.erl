@@ -489,6 +489,25 @@ transmission_with_client_certificate_test() ->
 transmission_without_client_certificate_test() ->
     transmission_test_with_opts([certificate()], []).
 
+transmission_without_server_cert_fails_test() ->
+    TestPid = self(),
+    {ok, ListenSocket} = gen_tcp:listen(0, [binary, {packet, 0}, {active, false},
+                                            {reuseaddr, true}, {nodelay, true}]),
+    {ok, Port} = inet:port(ListenSocket),
+    ListenerPid = spawn(fun() -> {ok, Socket} = gen_tcp:accept(ListenSocket),
+                                 Res = tcp_to_tls(Socket, []),
+                                 TestPid ! {listener_tcp_to_tls, Res}
+                        end),
+    {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {packet, 0}, {active, false},
+                                                          {reuseaddr, true}, {nodelay, true}]),
+    {ok, TLSSock} = tcp_to_tls(Socket, [connect]),
+    close(TLSSock),
+    receive
+        {listener_tcp_to_tls, Res} ->
+            ?assertEqual({error, no_certfile}, Res)
+    end.
+
+
 transmission_test_with_opts(ListenerOpts, SenderOpts) ->
     {LPid, Port} = setup_listener(ListenerOpts),
     SPid = setup_sender(Port, SenderOpts),
