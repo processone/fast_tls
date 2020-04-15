@@ -143,10 +143,8 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 terminate(_Reason, _State) ->
     ok.
 
--spec tcp_to_tls(inet:socket(),
-                 [{atom(), any()}]) -> {'error', 'no_certfile' | binary()} |
-{ok, tls_socket()}.
-
+-spec tcp_to_tls(inet:socket(), [atom() | {atom(), any()}]) ->
+    {ok, tls_socket()} | {'error', 'no_certfile' | binary()}.
 tcp_to_tls(TCPSocket, Options) ->
     Command = case lists:member(connect, Options) of
                   true -> ?SET_CERTIFICATE_FILE_CONNECT;
@@ -211,32 +209,27 @@ tcp_to_tls(TCPSocket, Options) ->
     end.
 
 -spec tls_to_tcp(tls_socket()) -> inet:socket().
-
-tls_to_tcp(#tlssock{tcpsock = TCPSocket,
-                    tlsport = Port}) ->
+tls_to_tcp(#tlssock{tcpsock = TCPSocket, tlsport = Port}) ->
     invalidate_nif(Port),
     TCPSocket.
 
+-spec recv(tls_socket(), non_neg_integer()) ->
+    {error, inet:posix()} | {error, binary()} | {ok, binary()}.
 recv(Socket, Length) -> recv(Socket, Length, infinity).
 
--spec recv(tls_socket(), non_neg_integer(),
-           timeout()) -> {error, inet:posix()} |
-{error, binary()} |
-{ok, binary()}.
-
+-spec recv(tls_socket(), non_neg_integer(), timeout()) ->
+    {error, inet:posix()} | {error, binary()} | {ok, binary()}.
 recv(TLSSock, Length, Timeout) ->
     recv_and_loop(TLSSock, <<>>, <<>>, <<>>,
                   case Length of 0 -> -1; _ -> Length end, Timeout).
 
--spec recv_data(tls_socket(), binary()) -> {error, inet:posix() | binary()} |
-{ok, binary()}.
-
+-spec recv_data(tls_socket(), binary()) ->
+    {error, inet:posix() | binary()} | {ok, binary()}.
 recv_data(TLSSock, Packet) ->
     loop(TLSSock, <<>>, Packet, <<>>, -1).
 
 -spec loop(tls_socket(), binary(), binary(), binary(), integer()) ->
-    {error, inet:posix() | binary()} |
-    {ok, binary()}.
+    {error, inet:posix() | binary()} | {ok, binary()}.
 loop(#tlssock{tcpsock = TCPSocket,
               tlsport = Port} = Socket,
      ToSend, Received, DecBuf, Length) ->
@@ -257,9 +250,8 @@ loop(#tlssock{tcpsock = TCPSocket,
         {error, einval}
     end.
 
--spec recv_and_loop(tls_socket(), binary(), binary(), binary(), integer(), integer()) ->
-    {error, inet:posix() | binary()} |
-    {ok, binary()}.
+-spec recv_and_loop(tls_socket(), binary(), binary(), binary(), integer(), timeout()) ->
+    {error, inet:posix() | binary()} | {ok, binary()}.
 recv_and_loop(#tlssock{tcpsock = TCPSocket} = Socket,
               ToSend, Received, DecBuf, Length, Timeout) ->
     case loop(Socket, ToSend, Received, DecBuf, Length) of
@@ -287,8 +279,8 @@ recv_and_loop(#tlssock{tcpsock = TCPSocket} = Socket,
             end
     end.
 
--spec send(tls_socket(), binary()) -> ok | {error, inet:posix() | binary() | timeout}.
-
+-spec send(tls_socket(), binary()) ->
+    ok | {error, inet:posix() | binary() | timeout}.
 send(Socket, Packet) ->
     case loop(Socket, Packet, <<>>, <<>>, 0) of
         {ok, <<>>} ->
@@ -299,14 +291,13 @@ send(Socket, Packet) ->
             Other
     end.
 
--spec setopts(tls_socket(), list()) -> ok | {error, inet:posix()}.
-
+-spec setopts(tls_socket(), list()) ->
+    ok | {error, inet:posix()}.
 setopts(#tlssock{tcpsock = TCPSocket}, Opts) ->
     inet:setopts(TCPSocket, Opts).
 
--spec sockname(tls_socket()) -> {ok, {inet:ip_address(), inet:port_number()}} |
-{error, inet:posix()}.
-
+-spec sockname(tls_socket()) ->
+    {ok, {inet:ip_address(), inet:port_number()}} | {error, inet:posix()}.
 sockname(#tlssock{tcpsock = TCPSocket}) ->
     inet:sockname(TCPSocket).
 
@@ -468,8 +459,6 @@ load_nif() ->
 load_nif(SOPath) ->
     case erlang:load_nif(SOPath, 0) of
         ok ->
-            ok;
-        {error, already_loaded} ->
             ok;
         {error, ErrorDesc} = Err ->
             error_logger:error_msg("failed to load TLS NIF: ~s~n",
