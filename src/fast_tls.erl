@@ -22,16 +22,15 @@
 %%%----------------------------------------------------------------------
 
 -module(fast_tls).
+-on_load(load_nif/0).
 
 -author('alexey@process-one.net').
-
--behaviour(gen_server).
 
 -export([open_nif/8, loop_nif/4, get_peer_certificate_nif/1,
          get_verify_result_nif/1, invalidate_nif/1,
          get_negotiated_cipher_nif/1]).
 
--export([start_link/0, tcp_to_tls/2,
+-export([tcp_to_tls/2,
          tls_to_tcp/1, send/2, recv/2, recv/3, recv_data/2,
          setopts/2, sockname/1, peername/1,
          controlling_process/2, close/1,
@@ -39,10 +38,6 @@
          get_verify_result/1, get_cert_verify_string/2,
          add_certfile/2, get_certfile/1, delete_certfile/1,
          clear_cache/0, get_negotiated_cipher/1]).
-
-%% Internal exports, call-back functions.
--export([init/1, handle_call/3, handle_cast/2,
-         handle_info/2, code_change/3, terminate/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -80,18 +75,6 @@
 
 -export_type([tls_socket/0]).
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [],
-                          []).
-
-init([]) ->
-    case load_nif() of
-        ok ->
-            {ok, []};
-        {error, Why} ->
-            {stop, Why}
-    end.
-
 open_nif(_Flags, _CertFile, _Ciphers, _ProtocolOpts, _DHFile, _CAFile, _SNI, _ALPN) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
@@ -125,21 +108,6 @@ get_negotiated_cipher_nif(_Port) ->
 %%% --------------------------------------------------------
 %%% The call-back functions.
 %%% --------------------------------------------------------
-
-handle_call(_, _, State) -> {noreply, State}.
-
-handle_cast(_, State) -> {noreply, State}.
-
-handle_info({'EXIT', Port, Reason}, Port) ->
-    {stop, {port_died, Reason}, Port};
-handle_info({'EXIT', _Pid, _Reason}, Port) ->
-    {noreply, Port};
-handle_info(_, State) -> {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) -> {ok, State}.
-
-terminate(_Reason, _State) ->
-    ok.
 
 -spec tcp_to_tls(inet:socket(), [atom() | {atom(), any()}]) ->
     {ok, tls_socket()} | {'error', 'no_certfile' | binary()}.
@@ -449,6 +417,7 @@ encode_alpn(ProtoList) ->
 
 load_nif() ->
     SOPath = p1_nif_utils:get_so_path(fast_tls, [fast_tls], "fast_tls"),
+    ok = p1_sha:load_nif(),
     load_nif(SOPath).
 
 load_nif(SOPath) ->
@@ -463,10 +432,6 @@ load_nif(SOPath) ->
 
 -ifdef(TEST).
 
-load_nif_test() ->
-    SOPath = p1_nif_utils:get_so_path(fast_tls, [], "fast_tls"),
-    ?assertEqual(ok, load_nif(SOPath)).
-
 transmission_with_client_certificate_test() ->
     transmission_test_with_opts([certificate()], [certificate()]).
 
@@ -478,7 +443,7 @@ transmission_without_server_cert_fails_test() ->
     {ok, ListenSocket} = gen_tcp:listen(0, [binary, {packet, 0}, {active, false},
                                             {reuseaddr, true}, {nodelay, true}]),
     {ok, Port} = inet:port(ListenSocket),
-    ListenerPid = spawn(fun() -> {ok, Socket} = gen_tcp:accept(ListenSocket),
+    _ListenerPid = spawn(fun() -> {ok, Socket} = gen_tcp:accept(ListenSocket),
                                  Res = tcp_to_tls(Socket, []),
                                  TestPid ! {listener_tcp_to_tls, Res}
                         end),
