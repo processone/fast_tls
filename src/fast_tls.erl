@@ -315,7 +315,7 @@ get_negotiated_cipher(#tlssock{tlsport = Port}) ->
             error
     end.
 
--spec get_tls_last_message(peer | self, tls_socket()) -> binary().
+-spec get_tls_last_message(peer | self, tls_socket()) -> {ok, binary()} | {error, term()}.
 get_tls_last_message(peer, #tlssock{tlsport = Port}) ->
     tls_get_peer_finished_nif(Port);
 get_tls_last_message(self, #tlssock{tlsport = Port}) ->

@@ -1221,21 +1221,20 @@ static ERL_NIF_TERM tls_get_peer_finished_nif(ErlNifEnv *env, int argc, const ER
     if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
         return enif_make_badarg(env);
 
-    ErlNifBinary    bin;
-	/*
-	 * OpenSSL does not offer an API to directly get the length of the
+	/* OpenSSL does not offer an API to directly get the length of the
 	 * expected TLS Finished message, so just do a dummy call to grab this
 	 * information to allow caller to do an allocation with a correct size.
 	 */
+    ERL_NIF_TERM bin;
     size_t len = SSL_get_peer_finished(state->ssl, NULL, 0);
-    if(!enif_alloc_binary(len, &bin))
+    if (len == 0)
+        return ERR_T(enif_make_atom(env, "undefined"));
+    unsigned char *buf = enif_make_new_binary(env, len, &bin);
+    if (!buf)
         return ERR_T(enif_make_atom(env, "enomem"));
 
-	(void) SSL_get_peer_finished(state->ssl, bin.data, len);
-    if (!bin.data)
-        return ERR_T(enif_make_atom(env, "enomem"));
-
-    return enif_make_binary(env, &bin);
+	(void) SSL_get_peer_finished(state->ssl, buf, len);
+    return OK_T(bin);
 }
 
 static ERL_NIF_TERM tls_get_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
@@ -1243,16 +1242,16 @@ static ERL_NIF_TERM tls_get_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF
     if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
         return enif_make_badarg(env);
 
-    ErlNifBinary    bin;
+    ERL_NIF_TERM bin;
     size_t len = SSL_get_finished(state->ssl, NULL, 0);
-    if(!enif_alloc_binary(len, &bin))
+    if (len == 0)
+        return ERR_T(enif_make_atom(env, "undefined"));
+    unsigned char *buf = enif_make_new_binary(env, len, &bin);
+    if (!buf)
         return ERR_T(enif_make_atom(env, "enomem"));
 
-	(void) SSL_get_finished(state->ssl, bin.data, len);
-    if (!bin.data)
-        return ERR_T(enif_make_atom(env, "enomem"));
-
-    return enif_make_binary(env, &bin);
+	(void) SSL_get_finished(state->ssl, buf, len);
+    return OK_T(bin);
 }
 
 static ErlNifFunc nif_funcs[] =
