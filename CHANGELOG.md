@@ -1,3 +1,10 @@
+# Version 1.1.5
+
+* Don't require providing client side certificate when acting as client.
+* Simplify code for loading nif component by using -on\_load
+* Add API endpoint for retrieving information required for channel
+  binding
+
 # Version 1.1.4
 
 * Updating p1_utils to version 1.0.18.
