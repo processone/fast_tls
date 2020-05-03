@@ -23,6 +23,12 @@ static int load(ErlNifEnv* env, void** priv, ERL_NIF_TERM load_info)
     return 0;
 }
 
+static int upgrade(ErlNifEnv* caller_env, void** priv_data,
+		   void** old_priv_data, ERL_NIF_TERM load_info)
+{
+    return 0;
+}
+
 static ERL_NIF_TERM to_hexlist(ErlNifEnv* env, int argc,
 			       const ERL_NIF_TERM argv[])
 {
@@ -50,4 +56,4 @@ static ErlNifFunc nif_funcs[] =
 	{"to_hexlist", 1, to_hexlist}
     };
 
-ERL_NIF_INIT(p1_sha, nif_funcs, load, NULL, NULL, NULL)
+ERL_NIF_INIT(p1_sha, nif_funcs, load, NULL, upgrade, NULL)

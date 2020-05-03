@@ -429,12 +429,15 @@ encode_alpn(ProtoList) ->
 
 load_nif() ->
     SOPath = p1_nif_utils:get_so_path(fast_tls, [fast_tls], "fast_tls"),
-    ok = p1_sha:load_nif(),
     load_nif(SOPath).
 
 load_nif(SOPath) ->
     case erlang:load_nif(SOPath, 0) of
         ok ->
+            ok;
+        {error, {reload, _}} -> % We don't support upgrade in this module so let's not crash
+            ok;
+        {error, {upgrade, _}} -> % We don't support upgrade in this module so let's not crash
             ok;
         {error, ErrorDesc} = Err ->
             error_logger:error_msg("failed to load TLS NIF: ~s~n",

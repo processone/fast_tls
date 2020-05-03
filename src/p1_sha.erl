@@ -22,6 +22,7 @@
 %%%----------------------------------------------------------------------
 
 -module(p1_sha).
+-on_load(load_nif/0).
 
 -author('alexey@process-one.net').
 
@@ -89,9 +90,6 @@ sha512(Text) ->
 %%% Unit tests
 %%%===================================================================
 -ifdef(TEST).
-
-load_nif_test() ->
-    ?assertEqual(ok, load_nif(p1_nif_utils:get_so_path(?MODULE, [], "p1_sha"))).
 
 sha1_test() ->
     ?assertEqual(
