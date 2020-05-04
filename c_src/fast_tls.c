@@ -1233,7 +1233,7 @@ static ERL_NIF_TERM tls_get_peer_finished_nif(ErlNifEnv *env, int argc, const ER
     if (!buf)
         return ERR_T(enif_make_atom(env, "enomem"));
 
-	(void) SSL_get_peer_finished(state->ssl, buf, len);
+    (void) SSL_get_peer_finished(state->ssl, buf, len);
     return OK_T(bin);
 }
 
@@ -1250,7 +1250,7 @@ static ERL_NIF_TERM tls_get_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF
     if (!buf)
         return ERR_T(enif_make_atom(env, "enomem"));
 
-	(void) SSL_get_finished(state->ssl, buf, len);
+    (void) SSL_get_finished(state->ssl, buf, len);
     return OK_T(bin);
 }
 
