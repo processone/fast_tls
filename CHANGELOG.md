@@ -1,3 +1,7 @@
+# Version 1.1.6
+
+* Change nif loading to make test more reliable
+
 # Version 1.1.5
 
 * Don't require providing client side certificate when acting as client.
