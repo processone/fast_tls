@@ -1,5 +1,6 @@
 # Version 1.1.6
 
+* Updating p1_utils to version 1.0.19.
 * Change nif loading to make test more reliable
 
 # Version 1.1.5
