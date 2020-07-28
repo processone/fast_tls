@@ -1,3 +1,7 @@
+# Version 1.1.8
+
+* Updating p1_utils to version 1.0.20.
+
 # Version 1.1.7
 
 * Add fix and test with Erlang/OTP 23.0
