@@ -1,3 +1,6 @@
+arch:
+  - ppc64le
+  - amd64
 language: erlang
 
 os: linux
@@ -6,6 +9,7 @@ dist: xenial
 
 before_install:
   - pip install --user cpp-coveralls coveralls-merge
+  - if [ "$TRAVIS_ARCH" = "ppc64le" ]; then sudo apt-get update; sudo apt-get install rebar; fi
 
 install:
   - ./configure --enable-gcov
@@ -25,3 +29,15 @@ otp_release:
   - 21.3
   - 22.3
   - 23.0
+# Disable otp_release 17.1/18.3/19.3 as these releases are not supported on Ubuntu16.04 for arch: ppc64le
+jobs: 
+ exclude:
+  - arch: ppc64le
+    otp_release: 17.1
+  - arch: ppc64le
+    otp_release: 18.3
+  - arch: ppc64le
+    otp_release: 19.3
+    
+    
+    
