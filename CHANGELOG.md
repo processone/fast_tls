@@ -1,3 +1,8 @@
+# Version 1.1.9
+
+* Exclude old OTP releases in Travis
+* Update hex to compile ejabberd with rebar3
+
 # Version 1.1.8
 
 * Updating p1_utils to version 1.0.20.
