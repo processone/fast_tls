@@ -1,3 +1,7 @@
+# Version 1.1.10
+
+* Updating p1_utils to version 1.0.21.
+
 # Version 1.1.9
 
 * Exclude old OTP releases in Travis
