@@ -23,7 +23,7 @@
 
 {application, fast_tls,
     [{description, "TLS / SSL OpenSSL-based native driver for Erlang / Elixir"},
-     {vsn, "1.1.10"},
+     {vsn, "1.1.11"},
      {modules, []},
      {registered, []},
      {applications, [kernel, stdlib, crypto, p1_utils]},
