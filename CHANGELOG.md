@@ -1,3 +1,7 @@
+# Version 1.1.12
+
+* Updating p1_utils to version 1.0.22.
+
 # Version 1.1.11
 
 * Add missing applicaitons in fast_tls.app
