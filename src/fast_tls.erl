@@ -428,6 +428,11 @@ encode_alpn(ProtoList) ->
     [<<(size(Proto)), Proto/binary>> || Proto <- ProtoList, Proto /= <<>>].
 
 load_nif() ->
+    case os:getenv("COVERALLS") of
+        "true" -> ok;
+        _ -> load_nif2()
+    end.
+load_nif2() ->
     SOPath = p1_nif_utils:get_so_path(fast_tls, [fast_tls], "fast_tls"),
     load_nif(SOPath).
 
@@ -583,7 +588,12 @@ sender_loop(TLSSock) ->
             Pid ! {result, Res, Finished}
     end.
 
+-ifdef(REBAR3).
+certificate() ->
+    {certfile, <<"tests/cert.pem">>}.
+-else.
 certificate() ->
     {certfile, <<"../tests/cert.pem">>}.
+-endif.
 
 -endif.

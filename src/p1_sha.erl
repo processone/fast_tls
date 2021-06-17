@@ -43,6 +43,11 @@
 %%% API functions
 %%%===================================================================
 load_nif() ->
+    case os:getenv("COVERALLS") of
+        "true" -> ok;
+        _ -> load_nif2()
+    end.
+load_nif2() ->
     load_nif(p1_nif_utils:get_so_path(?MODULE, [fast_tls], "p1_sha")).
 
 load_nif(SOPath) ->
