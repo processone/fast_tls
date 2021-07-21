@@ -1,3 +1,7 @@
+# Version 1.1.13
+
+* Switch from using Travis to Github Actions as CI
+
 # Version 1.1.12
 
 * Updating p1_utils to version 1.0.22.
