@@ -350,7 +350,7 @@ add_certfile(Domain, File) ->
 get_certfile(Domain) ->
     get_certfile_nif(Domain).
 
-%% @doc Returns `true` if element is deleted, `false` otherwise
+%% @doc Returns true if element is deleted, false otherwise
 -spec delete_certfile(iodata()) -> boolean().
 delete_certfile(Domain) ->
     delete_certfile_nif(Domain).
