@@ -1254,6 +1254,37 @@ static ERL_NIF_TERM tls_get_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF
     return OK_T(bin);
 }
 
+static ERL_NIF_TERM set_fips_mode_nif(ErlNifEnv *env, int argc,
+                                      const ERL_NIF_TERM argv[]) {
+  int ret = 1;
+  int enable;
+
+  if (argc != 1)
+    return enif_make_badarg(env);
+
+  if (!enif_get_int(env, argv[0], &enable))
+    return enif_make_badarg(env);
+
+  int fips_mode = FIPS_mode();
+
+  if ((fips_mode == 0 && enable != 0) ||
+      (fips_mode != 0 && enable == 0))
+    ret = FIPS_mode_set(enable);
+
+  if (ret != 1)
+    return ssl_error(env, "FIPS_mode_set() failed");
+
+  return enif_make_atom(env, "ok");
+}
+
+static ERL_NIF_TERM get_fips_mode_nif(ErlNifEnv *env, int argc,
+                                      const ERL_NIF_TERM argv[]) {
+
+  const char *ret = FIPS_mode() ? "true" : "false";
+
+  return enif_make_atom(env, ret);
+}
+
 static ErlNifFunc nif_funcs[] =
         {
                 {"open_nif",                  8, open_nif},
@@ -1267,7 +1298,9 @@ static ErlNifFunc nif_funcs[] =
                 {"invalidate_nif",            1, invalidate_nif},
                 {"get_negotiated_cipher_nif", 1, get_negotiated_cipher_nif},
                 {"tls_get_peer_finished_nif", 1, tls_get_peer_finished_nif},
-                {"tls_get_finished_nif",      1, tls_get_finished_nif}
+                {"tls_get_finished_nif",      1, tls_get_finished_nif},
+                {"set_fips_mode_nif",         1, set_fips_mode_nif},
+                {"get_fips_mode_nif",         0, get_fips_mode_nif}
         };
 
 ERL_NIF_INIT(fast_tls, nif_funcs, load, NULL, NULL, unload)

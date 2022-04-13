@@ -28,7 +28,8 @@
 
 -export([open_nif/8, loop_nif/4, get_peer_certificate_nif/1,
          get_verify_result_nif/1, invalidate_nif/1,
-         get_negotiated_cipher_nif/1]).
+         get_negotiated_cipher_nif/1, set_fips_mode_nif/1,
+         get_fips_mode_nif/0]).
 
 -export([tcp_to_tls/2,
          tls_to_tcp/1, send/2, recv/2, recv/3, recv_data/2,
@@ -38,7 +39,7 @@
          get_verify_result/1, get_cert_verify_string/2,
          add_certfile/2, get_certfile/1, delete_certfile/1,
          clear_cache/0, get_negotiated_cipher/1,
-         get_tls_last_message/2]).
+         get_tls_last_message/2, set_fips_mode/1, get_fips_mode/0]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -110,6 +111,12 @@ tls_get_peer_finished_nif(_Port) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 tls_get_finished_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+set_fips_mode_nif(_Flag) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+get_fips_mode_nif() ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 %%% --------------------------------------------------------
@@ -362,6 +369,18 @@ delete_certfile(Domain) ->
 clear_cache() ->
     clear_cache_nif().
 
+%% @doc Enables/disables FIPS mode
+-spec set_fips_mode(boolean()) -> ok | {error, binary()}.
+set_fips_mode(true) ->
+    set_fips_mode_nif(1);
+set_fips_mode(false) ->
+    set_fips_mode_nif(0).
+
+%% @doc Checks whether FIPS mode is enabled or not
+-spec get_fips_mode() -> boolean().
+get_fips_mode() ->
+    get_fips_mode_nif().
+
 cert_verify_code(0)  -> <<"ok">>;
 cert_verify_code(2) ->
     <<"unable to get issuer certificate">>;
@@ -439,7 +458,7 @@ load_nif2() ->
 load_nif(SOPath) ->
     case erlang:load_nif(SOPath, 0) of
         ok ->
-            ok;
+            set_fips_mode();
         {error, {reload, _}} -> % We don't support upgrade in this module so let's not crash
             ok;
         {error, {upgrade, _}} -> % We don't support upgrade in this module so let's not crash
@@ -448,6 +467,20 @@ load_nif(SOPath) ->
             error_logger:error_msg("failed to load TLS NIF: ~s~n",
                                    [erl_ddll:format_error(ErrorDesc)]),
             Err
+    end.
+
+-spec set_fips_mode() -> ok | {error, term()}.
+set_fips_mode() ->
+    case application:get_env(?MODULE, fips_mode) of
+        {ok, Flag} when Flag == true orelse Flag == false ->
+            case set_fips_mode(Flag) of
+                ok -> ok;
+                {error, Reason} = Err ->
+                    error_logger:error_msg("~s", [Reason]),
+                    Err
+            end;
+        _ ->
+            ok
     end.
 
 -ifdef(TEST).
