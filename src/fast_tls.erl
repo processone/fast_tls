@@ -26,7 +26,7 @@
 
 -author('alexey@process-one.net').
 
--export([open_nif/9, loop_nif/4, get_peer_certificate_nif/1,
+-export([open_nif/10, loop_nif/4, get_peer_certificate_nif/1,
          get_verify_result_nif/1, invalidate_nif/1,
          get_negotiated_cipher_nif/1, set_fips_mode_nif/1,
          get_fips_mode_nif/0]).
@@ -77,7 +77,7 @@
 
 -export_type([tls_socket/0]).
 
-open_nif(_Flags, _CertFile, _Ciphers, _ProtocolOpts, _DH, _DHFile, _CAFile, _SNI, _ALPN) ->
+open_nif(_Flags, _CertFile, _KeyFile, _Ciphers, _ProtocolOpts, _DH, _DHFile, _CAFile, _SNI, _ALPN) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 loop_nif(_Port, _ToSend, _Received, _ReceiveBytes) ->
@@ -172,6 +172,12 @@ tcp_to_tls(TCPSocket, Options) ->
                      false ->
                          <<>>
                  end,
+        KeyFile = case lists:keysearch(keyfile, 1, Options) of
+                      {value, {keyfile, KF}} when CertFile /= "" ->
+                          iolist_to_binary(KF);
+                      _ ->
+                          <<>>
+                  end,
         ServerName = case lists:keysearch(sni, 1, Options) of
                          {value, {sni, SNI}} ->
                              iolist_to_binary(SNI);
@@ -184,8 +190,8 @@ tcp_to_tls(TCPSocket, Options) ->
                    false ->
                        <<>>
                end,
-        case open_nif(Command bor Flags, CertFile, Ciphers, ProtocolOpts,
-                      DH, DHFile, CAFile, ServerName, ALPN) of
+        case open_nif(Command bor Flags, CertFile, KeyFile, Ciphers,
+                      ProtocolOpts, DH, DHFile, CAFile, ServerName, ALPN) of
             {ok, Port} ->
                 {ok, #tlssock{tcpsock = TCPSocket, tlsport = Port}};
             Err = {error, _} ->
