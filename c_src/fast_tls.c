@@ -20,6 +20,10 @@
 #include <erl_nif.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/core_names.h>
+#include <openssl/decoder.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdint.h>
@@ -45,7 +49,7 @@ typedef struct {
     char *cert_file;
     char *key_file;
     char *ciphers;
-    char *dh;
+    unsigned char *dh;
     size_t dh_size;
     char *dh_file;
     char *ca_file;
@@ -283,6 +287,7 @@ static void setup_ecdh(SSL_CTX *ctx) {
 /*
   2048-bit MODP Group with 256-bit Prime Order Subgroup (RFC5114)
 */
+
 static unsigned char dh2048_p[] = {
         0x87, 0xA8, 0xE6, 0x1D, 0xB4, 0xB6, 0x66, 0x3C,
         0xFF, 0xBB, 0xD1, 0x9C, 0x65, 0x19, 0x59, 0x99,
@@ -352,7 +357,8 @@ static unsigned char dh2048_g[] = {
         0x66, 0x4B, 0x4C, 0x0F, 0x6C, 0xC4, 0x16, 0x59,
 };
 
-static int setup_dh(SSL_CTX *ctx, char *dh_der, size_t dh_size, char *dh_file) {
+static int setup_dh(SSL_CTX *ctx, const unsigned char *dh_der, size_t dh_size, char *dh_file) {
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
     DH *dh;
     int res;
 
@@ -394,6 +400,65 @@ static int setup_dh(SSL_CTX *ctx, char *dh_der, size_t dh_size, char *dh_file) {
 
     DH_free(dh);
     return res;
+#else
+    if (!dh_der && !dh_file) {
+        OSSL_PARAM params[] = {
+                OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_P, dh2048_p, sizeof(dh2048_p)),
+                OSSL_PARAM_BN(OSSL_PKEY_PARAM_FFC_G, dh2048_g, sizeof(dh2048_g)),
+                OSSL_PARAM_END
+        };
+        EVP_PKEY *pkey = NULL;
+        EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
+
+        if (!pctx)
+            return 0;
+        if (EVP_PKEY_fromdata_init(pctx) <= 0 ||
+            EVP_PKEY_fromdata(pctx, &pkey, EVP_PKEY_KEY_PARAMETERS, params) <= 0) {
+            EVP_PKEY_CTX_free(pctx);
+        }
+        if (SSL_CTX_set0_tmp_dh_pkey(ctx, pkey) != 1) {
+            EVP_PKEY_free(pkey);
+            EVP_PKEY_CTX_free(pctx);
+            return 0;
+        }
+        EVP_PKEY_CTX_free(pctx);
+        return 1;
+    }
+
+    if (dh_der != NULL) {
+        OSSL_DECODER_CTX *dctx;
+        EVP_PKEY *pkey = NULL;
+        dctx = OSSL_DECODER_CTX_new_for_pkey(&pkey, "DER", NULL, "DH",
+                                             OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
+                                             NULL, NULL);
+        if (!dctx)
+            return 0;
+        if (OSSL_DECODER_from_data(dctx, &dh_der, &dh_size) <= 0)
+            return 0;
+        if (SSL_CTX_set0_tmp_dh_pkey(ctx, pkey) != 1) {
+            EVP_PKEY_free(pkey);
+            return 0;
+        }
+        return 1;
+    }
+
+    BIO *bio = BIO_new_file(dh_file, "r");
+    if (!bio)
+        return 0;
+    EVP_PKEY *pkey = PEM_read_bio_Parameters(bio, NULL);
+    if (!pkey) {
+        BIO_free(bio);
+        return 0;
+    }
+
+    if (SSL_CTX_set0_tmp_dh_pkey(ctx, pkey) != 1) {
+        EVP_PKEY_free(pkey);
+        BIO_free(bio);
+        return 0;
+    }
+    BIO_free(bio);
+    return 1;
+#endif
 }
 
 #endif
@@ -501,7 +566,7 @@ static ERL_NIF_TERM ssl_error(ErlNifEnv *env, const char *errstr) {
 }
 
 static SSL_CTX *create_new_ctx(char *cert_file, char *key_file,
-                               char *ciphers, char *dh, size_t dh_size,
+                               char *ciphers, unsigned char *dh, size_t dh_size,
                                char *dh_file, char *ca_file,
                                unsigned int command,
                                char **err_str) {
@@ -591,7 +656,7 @@ static void set_ctx(state_t *state, SSL_CTX *ctx) {
         state->ssl = SSL_new(ctx);
 }
 
-static const char *hex_encode(char *dst, const char *src, size_t size) {
+static const char *hex_encode(char *dst, const unsigned char *src, size_t size) {
   for (size_t i = 0; i < size; i++) {
     sprintf(dst + 2*i, "%02x", (unsigned char)src[i]);
   }
@@ -602,7 +667,7 @@ static const char *hex_encode(char *dst, const char *src, size_t size) {
 static char *create_ssl_for_cert(char *cert_file, state_t *state) {
     char *key_file = state->key_file;
     char *ciphers = state->ciphers;
-    char *dh = state->dh;
+    unsigned char *dh = state->dh;
     size_t dh_size = state->dh_size;
     char *dh_file = state->dh_file;
     char *ca_file = state->ca_file;
@@ -750,8 +815,8 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     }
     state->key_file = state->cert_file + certfile_bin.size + 1;
     state->ciphers = state->key_file + keyfile_bin.size + 1;
-    state->dh = state->ciphers + ciphers_bin.size + 1;
-    state->dh_file = state->dh + dh_bin.size + 1;
+    state->dh = (unsigned char*)(state->ciphers + ciphers_bin.size + 1);
+    state->dh_file = (char*)(state->dh + dh_bin.size + 1);
     state->ca_file = state->dh_file + dhfile_bin.size + 1;
     sni = state->ca_file + cafile_bin.size + 1;
     state->options = options;
