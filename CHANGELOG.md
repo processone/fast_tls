@@ -1,3 +1,7 @@
+# Version 1.1.15
+
+* Fix compilation on pre c99 systems
+
 # Version 1.1.14
 
 * Updating p1_utils to version 1.0.25.
