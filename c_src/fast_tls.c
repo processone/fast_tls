@@ -657,7 +657,8 @@ static void set_ctx(state_t *state, SSL_CTX *ctx) {
 }
 
 static const char *hex_encode(char *dst, const unsigned char *src, size_t size) {
-  for (size_t i = 0; i < size; i++) {
+  size_t i;
+  for (i = 0; i < size; i++) {
     sprintf(dst + 2*i, "%02x", (unsigned char)src[i]);
   }
   dst[size * 2] = 0;
