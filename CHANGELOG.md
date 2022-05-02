@@ -1,5 +1,6 @@
 # Version 1.1.14
 
+* Updating p1_utils to version 1.0.25.
 * Improve compatibility with OpenSSL 3.0
 * Improve compatiblity with LibreSSL >= 3.5
 * Add 'keyfile', 'dh' and 'fips_mode' options
