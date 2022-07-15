@@ -1385,7 +1385,7 @@ static ERL_NIF_TERM set_fips_mode_nif(ErlNifEnv *env, int argc,
 
   if (ret != 1)
     return ssl_error(env, "FIPS_mode_set() failed");
-#else
+#elif __GNUC__
 #warning OpenSSL 3 FIPS support not implemented
 #endif
 
@@ -1398,7 +1398,9 @@ static ERL_NIF_TERM get_fips_mode_nif(ErlNifEnv *env, int argc,
 #if OPENSSL_VERSION_NUMBER < 0x30000000L
   const char *ret = FIPS_mode() ? "true" : "false";
 #else
+#if __GNUC__
 #warning OpenSSL 3 FIPS support not implemented
+#endif
   static const char *ret = "false";
 #endif
 
