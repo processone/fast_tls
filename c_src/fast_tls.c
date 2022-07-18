@@ -481,7 +481,9 @@ static cert_info_t *lookup_certfile(const char *domain) {
     if (domain) {
         size_t len = strlen(domain);
         if (len) {
-            char name[len + 1];
+            char *name = enif_alloc(len + 1);
+            if (!name)
+                return ret;
             name[len] = 0;
             size_t i = 0;
             for (i = 0; i < len; i++)
@@ -500,6 +502,7 @@ static cert_info_t *lookup_certfile(const char *domain) {
                         ret = info;
                 }
             }
+            enif_free(name);
         }
     }
     return ret;
@@ -679,11 +682,18 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
     cert_info_t *info = NULL;
     cert_info_t *new_info = NULL;
     cert_info_t *old_info = NULL;
-    char dh_hex[dh_size * 2 + 1];
+    char *dh_hex = enif_alloc(dh_size * 2 + 1);
     size_t key_size =
             strlen(cert_file) + strlen(key_file) + strlen(ciphers) + 8 +
             dh_size * 2 + strlen(dh_file) + strlen(ca_file) + 1;
-    char key[key_size];
+    char *key = enif_alloc(key_size);
+
+    if (!dh_hex || !key) {
+        enif_free(dh_hex);
+        enif_free(key);
+        return "Memory allocation failed";
+    }
+
     sprintf(key, "%s%s%s%08lx%s%s%s",
             cert_file, key_file, ciphers,
             options, dh_file, ca_file,
@@ -731,6 +741,8 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
         set_ctx(state, info->ssl_ctx);
         enif_rwlock_runlock(certs_map_lock);
     }
+    enif_free(key);
+    enif_free(dh_hex);
     return ret;
 }
 
@@ -1223,7 +1235,10 @@ static ERL_NIF_TERM delete_certfile_nif(ErlNifEnv *env, int argc,
     if (!enif_inspect_iolist_as_binary(env, argv[0], &domain))
         return enif_make_badarg(env);
 
-    char key[domain.size + 1];
+    char *key = enif_alloc(domain.size + 1);
+    if (!key)
+        return enif_make_atom(env, "false");
+
     memcpy(key, domain.data, domain.size);
     key[domain.size] = 0;
     enif_rwlock_rwlock(certfiles_map_lock);
@@ -1234,6 +1249,7 @@ static ERL_NIF_TERM delete_certfile_nif(ErlNifEnv *env, int argc,
         ret = "true";
     }
     enif_rwlock_rwunlock(certfiles_map_lock);
+    enif_free(key);
 
     return enif_make_atom(env, ret);
 }
@@ -1247,7 +1263,10 @@ static ERL_NIF_TERM get_certfile_nif(ErlNifEnv *env, int argc,
     if (!enif_inspect_iolist_as_binary(env, argv[0], &domain))
         return enif_make_badarg(env);
 
-    char key[domain.size + 1];
+    char *key = enif_alloc(domain.size + 1);
+    if (!key)
+        return enif_make_atom(env, "error");
+
     memcpy(key, domain.data, domain.size);
     key[domain.size] = 0;
     enif_rwlock_rlock(certfiles_map_lock);
@@ -1263,6 +1282,7 @@ static ERL_NIF_TERM get_certfile_nif(ErlNifEnv *env, int argc,
         result = enif_make_atom(env, "error");
     }
     enif_rwlock_runlock(certfiles_map_lock);
+    enif_free(key);
 
     return result;
 }
@@ -1385,7 +1405,7 @@ static ERL_NIF_TERM set_fips_mode_nif(ErlNifEnv *env, int argc,
 
   if (ret != 1)
     return ssl_error(env, "FIPS_mode_set() failed");
-#else
+#elif __GNUC__
 #warning OpenSSL 3 FIPS support not implemented
 #endif
 
@@ -1398,7 +1418,9 @@ static ERL_NIF_TERM get_fips_mode_nif(ErlNifEnv *env, int argc,
 #if OPENSSL_VERSION_NUMBER < 0x30000000L
   const char *ret = FIPS_mode() ? "true" : "false";
 #else
+#if __GNUC__
 #warning OpenSSL 3 FIPS support not implemented
+#endif
   static const char *ret = "false";
 #endif
 
