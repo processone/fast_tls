@@ -953,6 +953,16 @@ get_decrypted_data(ErlNifEnv *env, state_t* state, int bytes_to_read, ERL_NIF_TE
             }
         }
     }
+
+#ifndef SSL_OP_NO_RENEGOTIATION
+    // Forbid client-initiated renegotiation for OpenSSL < 1.1.0h
+    if (state->handshakes > 1 && SSL_is_server(state->ssl)) {
+      enif_release_binary(&buf);
+      *ret = ERR_T(enif_make_atom(env, "closed"));
+      return 2;
+    }
+#endif
+
     enif_realloc_binary(&buf, pos);
     *ret = enif_make_binary(env, &buf);
     return 1;
