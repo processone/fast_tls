@@ -1,3 +1,8 @@
+# Version 1.1.16
+
+* Fix compilations on windows
+* Reintroduce blocking of renegotions for Openssl < 1.1.0h
+
 # Version 1.1.15
 
 * Fix compilation on pre c99 systems
