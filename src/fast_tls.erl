@@ -29,7 +29,7 @@
 -export([open_nif/10, loop_nif/4, get_peer_certificate_nif/1,
          get_verify_result_nif/1, invalidate_nif/1,
          get_negotiated_cipher_nif/1, set_fips_mode_nif/1,
-         get_fips_mode_nif/0]).
+         get_fips_mode_nif/0, get_tls_cb_exporter_nif/1]).
 
 -export([tcp_to_tls/2,
          tls_to_tcp/1, send/2, recv/2, recv/3, recv_data/2,
@@ -39,7 +39,8 @@
          get_verify_result/1, get_cert_verify_string/2,
          add_certfile/2, get_certfile/1, delete_certfile/1,
          clear_cache/0, get_negotiated_cipher/1,
-         get_tls_last_message/2, set_fips_mode/1, get_fips_mode/0]).
+         get_tls_last_message/2, set_fips_mode/1, get_fips_mode/0,
+         get_tls_cb_exporter/1]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -111,6 +112,9 @@ tls_get_peer_finished_nif(_Port) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 tls_get_finished_nif(_Port) ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+get_tls_cb_exporter_nif(_Port) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 set_fips_mode_nif(_Flag) ->
@@ -339,6 +343,10 @@ get_tls_last_message(peer, #tlssock{tlsport = Port}) ->
     tls_get_peer_finished_nif(Port);
 get_tls_last_message(self, #tlssock{tlsport = Port}) ->
     tls_get_finished_nif(Port).
+
+-spec get_tls_cb_exporter(tls_socket()) -> {ok, binary()} | {error, term()}.
+get_tls_cb_exporter(#tlssock{tlsport = Port}) ->
+    get_tls_cb_exporter_nif(Port).
 
 -spec get_verify_result(tls_socket()) -> byte().
 get_verify_result(#tlssock{tlsport = Port}) ->

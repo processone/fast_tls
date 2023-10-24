@@ -1395,6 +1395,23 @@ static ERL_NIF_TERM tls_get_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF
     return OK_T(bin);
 }
 
+static ERL_NIF_TERM get_tls_cb_exporter_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+    state_t *state = NULL;
+    if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
+        return enif_make_badarg(env);
+
+    ERL_NIF_TERM bin;
+    unsigned char *buf = enif_make_new_binary(env, 32, &bin);
+    if (!buf)
+        return ERR_T(enif_make_atom(env, "enomem"));
+
+    if (SSL_export_keying_material(state->ssl, buf, 32,
+         "EXPORTER-Channel-Binding", 24, NULL, 0, 0) != 1)
+        return ERR_T(enif_make_atom(env, "undefined"));
+
+    return OK_T(bin);
+}
+
 static ERL_NIF_TERM set_fips_mode_nif(ErlNifEnv *env, int argc,
                                       const ERL_NIF_TERM argv[]) {
   int ret = 1;
@@ -1451,6 +1468,7 @@ static ErlNifFunc nif_funcs[] =
                 {"get_negotiated_cipher_nif", 1,  get_negotiated_cipher_nif},
                 {"tls_get_peer_finished_nif", 1,  tls_get_peer_finished_nif},
                 {"tls_get_finished_nif",      1,  tls_get_finished_nif},
+                {"get_tls_cb_exporter_nif",   1,  get_tls_cb_exporter_nif},
                 {"set_fips_mode_nif",         1,  set_fips_mode_nif},
                 {"get_fips_mode_nif",         0,  get_fips_mode_nif}
         };
