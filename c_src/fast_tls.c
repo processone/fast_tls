@@ -1362,6 +1362,9 @@ static ERL_NIF_TERM tls_get_peer_finished_nif(ErlNifEnv *env, int argc, const ER
     if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
         return enif_make_badarg(env);
 
+    if (SSL_version(state->ssl) >= TLS1_3_VERSION)
+        return ERR_T(enif_make_atom(env, "undefined"));
+
 	/* OpenSSL does not offer an API to directly get the length of the
 	 * expected TLS Finished message, so just do a dummy call to grab this
 	 * information to allow caller to do an allocation with a correct size.
@@ -1382,6 +1385,9 @@ static ERL_NIF_TERM tls_get_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF
     state_t *state = NULL;
     if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
         return enif_make_badarg(env);
+
+    if (SSL_version(state->ssl) >= TLS1_3_VERSION)
+        return ERR_T(enif_make_atom(env, "undefined"));
 
     ERL_NIF_TERM bin;
     size_t len = SSL_get_finished(state->ssl, NULL, 0);
@@ -1405,8 +1411,11 @@ static ERL_NIF_TERM get_tls_cb_exporter_nif(ErlNifEnv *env, int argc, const ERL_
     if (!buf)
         return ERR_T(enif_make_atom(env, "enomem"));
 
+    if (SSL_version(state->ssl) < TLS1_3_VERSION && SSL_get_extms_support(state->ssl) <= 0)
+        return ERR_T(enif_make_atom(env, "undefined"));
+
     if (SSL_export_keying_material(state->ssl, buf, 32,
-         "EXPORTER-Channel-Binding", 24, NULL, 0, 0) != 1)
+         "EXPORTER-Channel-Binding", 24, NULL, 0, 1) != 1)
         return ERR_T(enif_make_atom(env, "undefined"));
 
     return OK_T(bin);
