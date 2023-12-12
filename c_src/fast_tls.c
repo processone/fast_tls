@@ -1362,9 +1362,10 @@ static ERL_NIF_TERM tls_get_peer_finished_nif(ErlNifEnv *env, int argc, const ER
     if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
         return enif_make_badarg(env);
 
+#ifdef TLS1_3_VERSION
     if (SSL_version(state->ssl) >= TLS1_3_VERSION)
         return ERR_T(enif_make_atom(env, "undefined"));
-
+#endif
 	/* OpenSSL does not offer an API to directly get the length of the
 	 * expected TLS Finished message, so just do a dummy call to grab this
 	 * information to allow caller to do an allocation with a correct size.
@@ -1386,8 +1387,10 @@ static ERL_NIF_TERM tls_get_finished_nif(ErlNifEnv *env, int argc, const ERL_NIF
     if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
         return enif_make_badarg(env);
 
+#ifdef TLS1_3_VERSION
     if (SSL_version(state->ssl) >= TLS1_3_VERSION)
         return ERR_T(enif_make_atom(env, "undefined"));
+#endif
 
     ERL_NIF_TERM bin;
     size_t len = SSL_get_finished(state->ssl, NULL, 0);
