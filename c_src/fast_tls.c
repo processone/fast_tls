@@ -1406,6 +1406,7 @@ static ERL_NIF_TERM get_tls_cb_exporter_nif(ErlNifEnv *env, int argc, const ERL_
     if (!enif_get_resource(env, argv[0], tls_state_t, (void *) &state))
         return enif_make_badarg(env);
 
+#ifdef TLS1_3_VERSION
     ERL_NIF_TERM bin;
     unsigned char *buf = enif_make_new_binary(env, 32, &bin);
     if (!buf)
@@ -1419,6 +1420,9 @@ static ERL_NIF_TERM get_tls_cb_exporter_nif(ErlNifEnv *env, int argc, const ERL_
         return ERR_T(enif_make_atom(env, "undefined"));
 
     return OK_T(bin);
+#else
+    return ERR_T(enif_make_atom(env, "undefined"));
+#endif
 }
 
 static ERL_NIF_TERM set_fips_mode_nif(ErlNifEnv *env, int argc,
