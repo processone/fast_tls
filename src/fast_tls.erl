@@ -232,16 +232,19 @@ loop(#tlssock{tcpsock = TCPSocket,
     try loop_nif(Port, ToSend, Received, Length) of
         {error, _} = Err ->
             Err;
-        {<<>>, Decrypted} ->
+        {ok, <<>>, Decrypted} ->
             {ok, <<DecBuf/binary, Decrypted/binary>>};
-        {ToWrite, Decrypted} ->
+        {ok, ToWrite, Decrypted} ->
             case gen_tcp:send(TCPSocket, ToWrite) of
                 ok ->
                     loop(Socket, <<>>, <<>>, <<DecBuf/binary, Decrypted/binary>>,
                          Length - byte_size(Decrypted));
                 {error, _} = Err ->
                     Err
-            end
+            end;
+        {{error, _} = Err, ToWrite, _} ->
+            _ = gen_tcp:send(TCPSocket, ToWrite),
+            Err
     catch error:badarg ->
         {error, einval}
     end.
