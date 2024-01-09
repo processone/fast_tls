@@ -969,7 +969,7 @@ get_decrypted_data(ErlNifEnv *env, state_t* state, int bytes_to_read, ERL_NIF_TE
 }
 
 static ERL_NIF_TERM
-return_read_write(ErlNifEnv *env, state_t* state, int bytes_to_read) {
+return_read_write(ErlNifEnv *env, state_t* state, int bytes_to_read, ERL_NIF_TERM tag) {
     ERL_NIF_TERM read;
     if (get_decrypted_data(env, state, bytes_to_read, &read) == 2) {
         enif_mutex_unlock(state->mtx);
@@ -979,7 +979,7 @@ return_read_write(ErlNifEnv *env, state_t* state, int bytes_to_read) {
 
     enif_mutex_unlock(state->mtx);
 
-    return enif_make_tuple2(env, write, read);
+    return enif_make_tuple3(env, tag, write, read);
 }
 
 static int
@@ -1095,9 +1095,12 @@ loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
                 if (res == 2) {
                     return err_term;
                 }
-                return return_read_write(env, state, bytes_to_read);
+                return return_read_write(env, state, bytes_to_read, enif_make_atom(env, "ok"));
             } else {
-                enif_mutex_unlock(state->mtx);
+                res = do_send_queue(env, state, &err_term, &to_send);
+                if (res == 2) {
+                    return err_term;
+                }
                 int reason = ERR_GET_REASON(ERR_peek_error());
                 if (reason == SSL_R_DATA_LENGTH_TOO_LONG ||
                     reason == SSL_R_PACKET_LENGTH_TOO_LONG ||
@@ -1107,11 +1110,12 @@ loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 		    reason == SSL_R_HTTP_REQUEST ||
 		    reason == SSL_R_HTTPS_PROXY_REQUEST)
                     /* Do not report badly formed Client Hello */
-                    return ERR_T(enif_make_atom(env, "closed"));
+                    err_term = ERR_T(enif_make_atom(env, "closed"));
                 else if (state->sni_error)
-                    return ssl_error(env, state->sni_error);
+                    err_term = ssl_error(env, state->sni_error);
                 else
-                    return ssl_error(env, "SSL_do_handshake failed");
+                    err_term = ssl_error(env, "SSL_do_handshake failed");
+                return return_read_write(env, state, bytes_to_read, err_term);
             }
         }
         if (!SSL_is_init_finished(state->ssl)) {
@@ -1119,7 +1123,7 @@ loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
             if (res == 2) {
                 return err_term;
             }
-            return return_read_write(env, state, bytes_to_read);
+            return return_read_write(env, state, bytes_to_read, enif_make_atom(env, "ok"));
         }
     }
 
@@ -1130,7 +1134,7 @@ loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 
     if (res <= 0)
         res = SSL_get_error(state->ssl, res);
-    return return_read_write(env, state, bytes_to_read);
+    return return_read_write(env, state, bytes_to_read, enif_make_atom(env, "ok"));
 }
 
 static ERL_NIF_TERM get_verify_result_nif(ErlNifEnv *env, int argc,
