@@ -415,6 +415,7 @@ static int setup_dh(SSL_CTX *ctx, const unsigned char *dh_der, size_t dh_size, c
         if (EVP_PKEY_fromdata_init(pctx) <= 0 ||
             EVP_PKEY_fromdata(pctx, &pkey, EVP_PKEY_KEY_PARAMETERS, params) <= 0) {
             EVP_PKEY_CTX_free(pctx);
+            return 0;
         }
         if (SSL_CTX_set0_tmp_dh_pkey(ctx, pkey) != 1) {
             EVP_PKEY_free(pkey);
