@@ -26,7 +26,7 @@
      {vsn, "1.1.16"},
      {modules, []},
      {registered, []},
-     {applications, [kernel, stdlib, crypto, p1_utils]},
+     {applications, [kernel, stdlib, crypto, public_key, p1_utils]},
 
      %% hex.pm packaging:
      {files, ["src/", "c_src/fast_tls.c", "c_src/uthash.h",
