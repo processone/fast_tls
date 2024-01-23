@@ -1,3 +1,7 @@
+# Version 1.1.18
+
+* Fix hex release process
+
 # Version 1.1.17
 
 * Add support for tls-exporter
