@@ -1,3 +1,9 @@
+# Version 1.1.17
+
+* Add support for tls-exporter
+* Send alert messages on handshake failures
+* Fix double free in setup_dh
+
 # Version 1.1.16
 
 * Fix compilations on windows
