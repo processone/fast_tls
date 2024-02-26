@@ -1,3 +1,7 @@
+# Version 1.1.19
+
+* Fix problem with get_peer_certificate in R27
+
 # Version 1.1.18
 
 * Fix hex release process
