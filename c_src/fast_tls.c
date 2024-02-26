@@ -1168,7 +1168,6 @@ static ERL_NIF_TERM get_peer_certificate_nif(ErlNifEnv *env, int argc,
     X509 *cert = NULL;
     state_t *state = NULL;
     int rlen;
-    ErlNifBinary output;
 
     if (argc != 1)
         return enif_make_badarg(env);
@@ -1193,14 +1192,16 @@ static ERL_NIF_TERM get_peer_certificate_nif(ErlNifEnv *env, int argc,
     }
     rlen = i2d_X509(cert, NULL);
     if (rlen >= 0) {
-        if (!enif_alloc_binary(rlen, &output)) {
+        ERL_NIF_TERM bin;
+        unsigned char *buf = enif_make_new_binary(env, rlen, &bin);
+        if (!buf) {
             enif_mutex_unlock(state->mtx);
             return ERR_T(enif_make_atom(env, "enomem"));
         }
-        i2d_X509(cert, &output.data);
+        i2d_X509(cert, &buf);
         X509_free(cert);
         enif_mutex_unlock(state->mtx);
-        return OK_T(enif_make_binary(env, &output));
+        return OK_T(bin);
     } else {
         X509_free(cert);
         enif_mutex_unlock(state->mtx);
