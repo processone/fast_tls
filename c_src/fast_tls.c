@@ -72,6 +72,10 @@ typedef unsigned __int32 uint32_t;
 #define DH_set0_pqg(dh, dh_p, param, dh_g) (dh)->p = dh_p; (dh)->g = dh_g
 #endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#define SSL_get_extms_support(s) 0
+#endif
+
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
 #define SSL_is_server(s) (s)->server
 #endif
