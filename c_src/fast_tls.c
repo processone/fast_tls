@@ -20,9 +20,11 @@
 #include <erl_nif.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/pkcs12.h>
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
 #include <openssl/core_names.h>
 #include <openssl/decoder.h>
+#include <openssl/provider.h>
 #endif
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1480,6 +1482,143 @@ static ERL_NIF_TERM get_fips_mode_nif(ErlNifEnv *env, int argc,
   return enif_make_atom(env, ret);
 }
 
+static ERL_NIF_TERM p12_to_pem_nif(ErlNifEnv *env, int argc,
+                                   const ERL_NIF_TERM argv[]) {
+    ErlNifBinary p12_bin, pass_bin;
+    cert_info_t *info = NULL;
+    cert_info_t *old_info = NULL;
+
+    if (argc != 2)
+        return enif_make_badarg(env);
+
+    if (!enif_inspect_iolist_as_binary(env, argv[0], &p12_bin))
+        return enif_make_badarg(env);
+    if (!enif_inspect_iolist_as_binary(env, argv[1], &pass_bin))
+        return enif_make_badarg(env);
+
+    PKCS12 *p12 = NULL;
+    EVP_PKEY *pkey = NULL;
+    X509 *cert;
+    BIO *bio;
+    ERL_NIF_TERM res;
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    OSSL_LIB_CTX *lib_ctx = OSSL_LIB_CTX_new();
+    OSSL_PROVIDER *prov_def, *prov_leg;
+    if (lib_ctx) {
+        prov_def = OSSL_PROVIDER_load(lib_ctx, "default");
+        prov_leg = OSSL_PROVIDER_load(lib_ctx, "legacy");
+    } else {
+        return ERR_T(enif_make_atom(env, "enomem"));
+    }
+
+    p12 = PKCS12_init_ex(NID_pkcs7_data, lib_ctx, NULL);
+    if (!p12) {
+        res = ERR_T(enif_make_atom(env, "enomem"));
+        goto clean;
+    }
+#endif
+
+    pkey = EVP_PKEY_new();
+    if (!pkey) {
+        res = ERR_T(enif_make_atom(env, "enomem"));
+        goto clean;
+    }
+
+    cert = X509_new();
+    if (!cert) {
+        res = ERR_T(enif_make_atom(env, "enomem"));
+        goto clean;
+    }
+    bio = BIO_new(BIO_s_mem());
+    if (!bio) {
+        res = ERR_T(enif_make_atom(env, "enomem"));
+        goto clean;
+    }
+
+
+    BIO* input = BIO_new_mem_buf(p12_bin.data, p12_bin.size);
+    if (!input) {
+        res = ERR_T(enif_make_atom(env, "enomem"));
+        goto clean;
+    }
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    PKCS12 *p12_tmp = p12;
+    if (!d2i_PKCS12_bio(input, &p12_tmp)) {
+        BIO_free(input);
+        res = ssl_error(env, "p12_to_pem:decode");
+        goto clean;
+    }
+    BIO_free(input);
+#else
+    p12 = d2i_PKCS12_bio(input, NULL);
+    BIO_free(input);
+    if (!p12) {
+        res = ssl_error(env, "p12_to_pem:decode");
+        goto clean;
+    }
+#endif
+    if (!PKCS12_parse(p12, pass_bin.data, &pkey, &cert, NULL)) {
+        unsigned long err = ERR_peek_error();
+        if (ERR_GET_LIB(err) == ERR_LIB_PKCS12 && ERR_GET_REASON(err) == PKCS12_R_MAC_VERIFY_FAILURE) {
+            res =  ERR_T(enif_make_atom(env, "bad_pass"));
+            goto clean;
+        }
+        res = ssl_error(env, "p12_to_pem:parse");
+        goto clean;
+    }
+
+    if (!PEM_write_bio_PrivateKey(bio, pkey, NULL, NULL, 0, 0, NULL)) {
+        res =  ssl_error(env, "p12_to_pem:privkey");
+        goto clean;
+    }
+
+    ERL_NIF_TERM pkey_bin;
+    size_t bio_size = BIO_ctrl_pending(bio);
+    unsigned char *bin_buf = enif_make_new_binary(env, bio_size, &pkey_bin);
+    if (!bin_buf) {
+        res = ERR_T(enif_make_atom(env, "enomem"));
+        goto clean;
+    }
+    BIO_read(bio, bin_buf, bio_size);
+    BIO_reset(bio);
+
+    if (!PEM_write_bio_X509(bio, cert)) {
+        res =  ssl_error(env, "p12_to_pem:cert");
+        goto clean;
+    }
+
+    ERL_NIF_TERM cert_bin;
+    bio_size = BIO_ctrl_pending(bio);
+    bin_buf = enif_make_new_binary(env, bio_size, &cert_bin);
+    if (!bin_buf) {
+        res = ERR_T(enif_make_atom(env, "enomem"));
+        goto clean;
+    }
+    BIO_read(bio, bin_buf, bio_size);
+    res = OK_T(enif_make_tuple2(env, pkey_bin, cert_bin));
+
+clean:
+    PKCS12_free(p12);
+    EVP_PKEY_free(pkey);
+    X509_free(cert);
+    BIO_free(bio);
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (lib_ctx) {
+        OSSL_PROVIDER_unload(prov_leg);
+        OSSL_PROVIDER_unload(prov_def);
+        OSSL_LIB_CTX_free(lib_ctx);
+    }
+#endif
+
+    ERR_clear_error();
+
+    return res;
+}
+
+
 static ErlNifFunc nif_funcs[] =
         {
                 {"open_nif",                  10, open_nif},
@@ -1496,7 +1635,8 @@ static ErlNifFunc nif_funcs[] =
                 {"tls_get_finished_nif",      1,  tls_get_finished_nif},
                 {"get_tls_cb_exporter_nif",   1,  get_tls_cb_exporter_nif},
                 {"set_fips_mode_nif",         1,  set_fips_mode_nif},
-                {"get_fips_mode_nif",         0,  get_fips_mode_nif}
+                {"get_fips_mode_nif",         0,  get_fips_mode_nif},
+                {"p12_to_pem_nif",            2,  p12_to_pem_nif}
         };
 
 ERL_NIF_INIT(fast_tls, nif_funcs, load, NULL, NULL, unload)

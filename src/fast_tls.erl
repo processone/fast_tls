@@ -29,7 +29,8 @@
 -export([open_nif/10, loop_nif/4, get_peer_certificate_nif/1,
          get_verify_result_nif/1, invalidate_nif/1,
          get_negotiated_cipher_nif/1, set_fips_mode_nif/1,
-         get_fips_mode_nif/0, get_tls_cb_exporter_nif/1]).
+         get_fips_mode_nif/0, get_tls_cb_exporter_nif/1,
+         p12_to_pem_nif/2]).
 
 -export([tcp_to_tls/2,
          tls_to_tcp/1, send/2, recv/2, recv/3, recv_data/2,
@@ -40,7 +41,7 @@
          add_certfile/2, get_certfile/1, delete_certfile/1,
          clear_cache/0, get_negotiated_cipher/1,
          get_tls_last_message/2, set_fips_mode/1, get_fips_mode/0,
-         get_tls_cb_exporter/1]).
+         get_tls_cb_exporter/1, p12_to_pem/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -121,6 +122,9 @@ set_fips_mode_nif(_Flag) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 get_fips_mode_nif() ->
+    erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+p12_to_pem_nif(_P12Data, _Pass) ->
     erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 %%% --------------------------------------------------------
@@ -403,6 +407,11 @@ set_fips_mode(false) ->
 -spec get_fips_mode() -> boolean().
 get_fips_mode() ->
     get_fips_mode_nif().
+
+%% @doc Converts PKCS12 certificate to PEM encoded private key and certificate
+-spec p12_to_pem(binary(), binary()) -> {ok, {binary(), binary()}} | {error, atom() | binary()}.
+p12_to_pem(P12Data, Pass) ->
+    p12_to_pem_nif(P12Data, <<Pass/binary, 0>>).
 
 cert_verify_code(0)  -> <<"ok">>;
 cert_verify_code(2) ->
