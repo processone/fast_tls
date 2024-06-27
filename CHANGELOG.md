@@ -1,3 +1,8 @@
+# Version 1.1.20
+
+* Fix compilation on LibreSSL
+* Add function for conversion of p12 certificates
+
 # Version 1.1.19
 
 * Fix problem with get_peer_certificate in R27
@@ -73,7 +78,7 @@
 # Version 1.1.4
 
 * Updating p1_utils to version 1.0.18.
-* Update copyright year 
+* Update copyright year
 
 # Version 1.1.3
 
@@ -122,7 +127,7 @@
 # Version 1.0.21
 
 * Updating p1_utils to version 1.0.11.
-* Fix compilation with rebar3 
+* Fix compilation with rebar3
 
 # Version 1.0.20
 
