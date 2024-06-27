@@ -1,5 +1,6 @@
 # Version 1.1.20
 
+* Updating p1_utils to version 1.0.26.
 * Fix compilation on LibreSSL
 * Add function for conversion of p12 certificates
 
