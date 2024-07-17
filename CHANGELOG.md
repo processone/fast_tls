@@ -1,3 +1,7 @@
+# Version 1.1.21
+
+* Add support for FIPS mode in openssl3
+
 # Version 1.1.20
 
 * Updating p1_utils to version 1.0.26.
