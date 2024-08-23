@@ -1102,7 +1102,7 @@ loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
                 if (res == 2) {
                     return err_term;
                 }
-                return return_read_write(env, state, bytes_to_read, enif_make_atom(env, "ok"));
+                return return_read_write(env, state, bytes_to_read, enif_make_atom(env, "init"));
             } else {
                 res = do_send_queue(env, state, &err_term, &to_send);
                 if (res == 2) {
@@ -1114,8 +1114,8 @@ loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
                     reason == SSL_R_UNKNOWN_PROTOCOL ||
                     reason == SSL_R_UNEXPECTED_MESSAGE ||
                     reason == SSL_R_WRONG_VERSION_NUMBER ||
-		    reason == SSL_R_HTTP_REQUEST ||
-		    reason == SSL_R_HTTPS_PROXY_REQUEST)
+                    reason == SSL_R_HTTP_REQUEST ||
+                    reason == SSL_R_HTTPS_PROXY_REQUEST)
                     /* Do not report badly formed Client Hello */
                     err_term = ERR_T(enif_make_atom(env, "closed"));
                 else if (state->sni_error)
@@ -1130,7 +1130,7 @@ loop_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
             if (res == 2) {
                 return err_term;
             }
-            return return_read_write(env, state, bytes_to_read, enif_make_atom(env, "ok"));
+            return return_read_write(env, state, bytes_to_read, enif_make_atom(env, "init"));
         }
     }
 

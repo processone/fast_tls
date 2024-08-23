@@ -41,7 +41,7 @@
          add_certfile/2, get_certfile/1, delete_certfile/1,
          clear_cache/0, get_negotiated_cipher/1,
          get_tls_last_message/2, set_fips_mode/1, get_fips_mode/0,
-         get_tls_cb_exporter/1, p12_to_pem/2]).
+         get_tls_cb_exporter/1, p12_to_pem/2, finish_handshake/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -236,9 +236,9 @@ loop(#tlssock{tcpsock = TCPSocket,
     try loop_nif(Port, ToSend, Received, Length) of
         {error, _} = Err ->
             Err;
-        {ok, <<>>, Decrypted} ->
+        {Tag, <<>>, Decrypted} when Tag == ok; Tag == init ->
             {ok, <<DecBuf/binary, Decrypted/binary>>};
-        {ok, ToWrite, Decrypted} ->
+        {Tag, ToWrite, Decrypted} when Tag == ok; Tag == init ->
             case gen_tcp:send(TCPSocket, ToWrite) of
                 ok ->
                     loop(Socket, <<>>, <<>>, <<DecBuf/binary, Decrypted/binary>>,
@@ -281,6 +281,38 @@ recv_and_loop(#tlssock{tcpsock = TCPSocket} = Socket,
                     {error, too_much_data_received}
             end
     end.
+
+-spec finish_handshake(tls_socket(), timeout()) ->
+    {error, inet:posix() | binary()} | ok.
+finish_handshake(#tlssock{tcpsock = TCPSocket, tlsport = Port}, Timeout) ->
+    OurLoop = fun OurLoop(Received) ->
+        try loop_nif(Port, <<>>, Received, 0) of
+            {error, _} = Err ->
+                Err;
+            {Tag, ToWrite, <<>>} when Tag == ok; Tag == init ->
+                case gen_tcp:send(TCPSocket, ToWrite) of
+                    ok when Tag == init ->
+                        case gen_tcp:recv(TCPSocket, 0, Timeout) of
+                            {ok, Received2} ->
+                                OurLoop(Received2);
+                            {error, _} = Err ->
+                                Err
+                        end;
+                    ok ->
+                        ok;
+                    {error, _} = Err ->
+                        Err
+                end;
+            {Tag, _ToWrite, _Data} when Tag == ok; Tag == init ->
+                {error, too_much_data_received};
+            {{error, _} = Err, ToWrite, _} ->
+                _ = gen_tcp:send(TCPSocket, ToWrite),
+                Err
+        catch error:badarg ->
+            {error, einval}
+        end
+    end,
+    OurLoop(<<>>).
 
 -spec send(tls_socket(), binary()) ->
     ok | {error, inet:posix() | binary() | timeout}.
