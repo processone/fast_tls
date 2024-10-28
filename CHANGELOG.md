@@ -1,3 +1,7 @@
+# Version 1.1.22
+
+* Add finish_handshake() function
+
 # Version 1.1.21
 
 * Add support for FIPS mode in openssl3
