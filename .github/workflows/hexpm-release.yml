@@ -7,7 +7,9 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
+    container:
+      image: public.ecr.aws/docker/library/erlang
     steps:
       - name: Check out
         uses: actions/checkout@v4
