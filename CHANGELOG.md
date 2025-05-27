@@ -1,3 +1,7 @@
+# Version 1.1.23
+
+* Updating p1_utils to version 1.0.27.
+
 # Version 1.1.22
 
 * Add finish_handshake() function
