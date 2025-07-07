@@ -26,6 +26,7 @@
 #include <openssl/decoder.h>
 #include <openssl/provider.h>
 #endif
+#include <openssl/x509v3.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdint.h>
@@ -260,6 +261,19 @@ static void unload(ErlNifEnv *env, void *priv) {
 
 static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
     return 1;
+}
+
+/*
+ * Override cert purpose, to accept certificates that have only
+ * server purpose flag as client certificate (needed for s2s authentication).
+ */
+static int cert_verify_callback(X509_STORE_CTX *x509, void *ptr) {
+    X509_VERIFY_PARAM *param = X509_STORE_CTX_get0_param(x509);
+    if (param) {
+      X509_VERIFY_PARAM_set_purpose(param, X509_PURPOSE_SSL_SERVER);
+      X509_VERIFY_PARAM_set_trust(param, X509_TRUST_SSL_SERVER);
+    }
+    return X509_verify_cert(x509);
 }
 
 /*
@@ -549,6 +563,7 @@ static int ssl_sni_callback(const SSL *s, int *foo, void *data) {
 #define SET_CERTIFICATE_FILE_CONNECT 2
 #define VERIFY_NONE 0x10000
 #define COMPRESSION_NONE 0x100000
+#define OVERRIDE_CERT_PURPOSE 0x200000
 
 static ERL_NIF_TERM ssl_error(ErlNifEnv *env, const char *errstr) {
     size_t rlen;
@@ -579,6 +594,7 @@ static SSL_CTX *create_new_ctx(char *cert_file, char *key_file,
                                char *ciphers, unsigned char *dh, size_t dh_size,
                                char *dh_file, char *ca_file,
                                unsigned int command,
+                               unsigned long flags,
                                char **err_str) {
     long verifyopts;
     int res = 0;
@@ -650,6 +666,8 @@ static SSL_CTX *create_new_ctx(char *cert_file, char *key_file,
     SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
 #endif
     SSL_CTX_set_verify(ctx, verifyopts, verify_callback);
+    if (flags & OVERRIDE_CERT_PURPOSE)
+        SSL_CTX_set_cert_verify_callback(ctx, cert_verify_callback, NULL);
 
 #ifndef SSL_OP_NO_RENEGOTIATION
     SSL_CTX_set_info_callback(ctx, &ssl_info_callback);
@@ -721,7 +739,7 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
 
         enif_rwlock_rwlock(certs_map_lock);
         SSL_CTX *ctx = create_new_ctx(cert_file, key_file, ciphers, dh, dh_size,
-                                      dh_file, ca_file, command, &ret);
+                                      dh_file, ca_file, command,options & OVERRIDE_CERT_PURPOSE, &ret);
         if (ret == NULL) {
             new_info = enif_alloc(sizeof(cert_info_t));
             if (new_info) {
@@ -839,7 +857,7 @@ static ERL_NIF_TERM open_nif(ErlNifEnv *env, int argc,
     state->dh_file = (char*)(state->dh + dh_bin.size + 1);
     state->ca_file = state->dh_file + dhfile_bin.size + 1;
     sni = state->ca_file + cafile_bin.size + 1;
-    state->options = options;
+    state->options = options | (flags & OVERRIDE_CERT_PURPOSE);
     state->command = command;
 
     memcpy(state->cert_file, certfile_bin.data, certfile_bin.size);

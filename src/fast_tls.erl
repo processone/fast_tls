@@ -67,6 +67,7 @@
 -define(VERIFY_NONE, 16#10000).
 
 -define(COMPRESSION_NONE, 16#100000).
+-define(OVERRIDE_CERT_PURPOSE, 16#200000).
 
 -define(PRINT(Format, Args), io:format(Format, Args)).
 
@@ -148,7 +149,11 @@ tcp_to_tls(TCPSocket, Options) ->
                      true -> ?COMPRESSION_NONE;
                      false -> 0
                  end,
-        Flags = Flags1 bor Flags2,
+        Flags3 = case lists:member(override_cert_purpose, Options) of
+                     true -> ?OVERRIDE_CERT_PURPOSE;
+                     false -> 0
+                 end,
+        Flags = Flags1 bor Flags2 bor Flags3,
         Ciphers =
         case lists:keysearch(ciphers, 1, Options) of
             {value, {ciphers, C}} ->
