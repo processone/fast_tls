@@ -1489,9 +1489,12 @@ static ERL_NIF_TERM get_fips_mode_nif(ErlNifEnv *env, int argc,
 static ERL_NIF_TERM p12_to_pem_nif(ErlNifEnv *env, int argc,
                                    const ERL_NIF_TERM argv[]) {
     ErlNifBinary p12_bin, pass_bin;
-    cert_info_t *info = NULL;
-    cert_info_t *old_info = NULL;
-
+    PKCS12 *p12 = NULL;
+    EVP_PKEY *pkey = NULL;
+    X509 *cert = NULL;
+    BIO *bio = NULL;
+    ERL_NIF_TERM res;
+    
     if (argc != 2)
         return enif_make_badarg(env);
 
@@ -1499,12 +1502,6 @@ static ERL_NIF_TERM p12_to_pem_nif(ErlNifEnv *env, int argc,
         return enif_make_badarg(env);
     if (!enif_inspect_iolist_as_binary(env, argv[1], &pass_bin))
         return enif_make_badarg(env);
-
-    PKCS12 *p12 = NULL;
-    EVP_PKEY *pkey = NULL;
-    X509 *cert;
-    BIO *bio;
-    ERL_NIF_TERM res;
 
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
     OSSL_LIB_CTX *lib_ctx = OSSL_LIB_CTX_new();
@@ -1563,7 +1560,7 @@ static ERL_NIF_TERM p12_to_pem_nif(ErlNifEnv *env, int argc,
         goto clean;
     }
 #endif
-    if (!PKCS12_parse(p12, pass_bin.data, &pkey, &cert, NULL)) {
+    if (!PKCS12_parse(p12, (char*)pass_bin.data, &pkey, &cert, NULL)) {
         unsigned long err = ERR_peek_error();
         if (ERR_GET_LIB(err) == ERR_LIB_PKCS12 && ERR_GET_REASON(err) == PKCS12_R_MAC_VERIFY_FAILURE) {
             res =  ERR_T(enif_make_atom(env, "bad_pass"));
