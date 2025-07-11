@@ -1,3 +1,7 @@
+# Version 1.1.24
+
+* Add option to accept client certificates that don't have sslclient purpose
+
 # Version 1.1.23
 
 * Updating p1_utils to version 1.0.27.
