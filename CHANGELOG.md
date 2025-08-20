@@ -1,3 +1,7 @@
+# Version 1.1.25
+
+* Fix compilation issues on illumos
+
 # Version 1.1.24
 
 * Updating p1_utils to version 1.0.28.
