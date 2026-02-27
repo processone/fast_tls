@@ -359,9 +359,7 @@ get_peer_certificate(TLSSock) ->
 -spec get_peer_certificate(tls_socket(), otp|plain) -> {ok, cert()} | error;
 			  (tls_socket(), der) -> {ok, binary()} | error.
 get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
-    case catch get_peer_certificate_nif(Port) of
-        {'EXIT', {badarg, _}} ->
-            error;
+    try get_peer_certificate_nif(Port) of
 	{ok, BCert} when Type == der ->
 	    {ok, BCert};
         {ok, BCert} ->
@@ -371,14 +369,20 @@ get_peer_certificate(#tlssock{tlsport = Port}, Type) ->
                 error
             end;
         {error, _} -> error
+    catch
+        error:badarg ->
+            error
     end.
 
 -spec get_negotiated_cipher(tls_socket()) -> error | {ok, binary()}.
 get_negotiated_cipher(#tlssock{tlsport = Port}) ->
-    case catch get_negotiated_cipher_nif(Port) of
+    try get_negotiated_cipher_nif(Port) of
         Val when is_binary(Val) ->
             {ok, Val};
         _ ->
+            error
+    catch
+        _:_ ->
             error
     end.
 

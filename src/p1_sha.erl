@@ -51,15 +51,16 @@ load_nif2() ->
     load_nif(p1_nif_utils:get_so_path(?MODULE, [fast_tls], "p1_sha")).
 
 load_nif(SOPath) ->
-    case catch erlang:load_nif(SOPath, 0) of
+    try erlang:load_nif(SOPath, 0) of
 	ok ->
 	    ok;
 	{error, {reload, _}} ->
 	    %% Do not log warning when just attempting to reload nif.
-	    ok;
-	Err ->
+	    ok
+    catch
+	Type:Err ->
 	    error_logger:warning_msg("unable to load sha NIF: ~p~n", [Err]),
-	    Err
+	    throw({Type, Err})
     end.
  
 -spec to_hexlist(iodata()) -> binary().
