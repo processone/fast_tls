@@ -11,7 +11,9 @@ c_src/*.o
 config.log
 config.status
 deps
+doc
 ebin
 priv
 rebar.lock
+test/*.beam
 vars.config
