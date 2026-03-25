@@ -1,3 +1,7 @@
+# Version 1.1.26
+
+* Fix new deprecation in R29
+
 # Version 1.1.25
 
 * Fix compilation issues on illumos
