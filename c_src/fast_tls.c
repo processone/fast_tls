@@ -709,7 +709,7 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
     cert_info_t *old_info = NULL;
     char *dh_hex = enif_alloc(dh_size * 2 + 1);
     size_t key_size =
-            strlen(cert_file) + strlen(key_file) + strlen(ciphers) + 8 +
+            strlen(cert_file) + strlen(key_file) + strlen(ciphers) + 8 + 8 +
             dh_size * 2 + strlen(dh_file) + strlen(ca_file) + 1;
     char *key = enif_alloc(key_size);
 
@@ -719,9 +719,9 @@ static char *create_ssl_for_cert(char *cert_file, state_t *state) {
         return "Memory allocation failed";
     }
 
-    sprintf(key, "%s%s%s%08lx%s%s%s",
+    sprintf(key, "%s%s%s%08lx%08x%s%s%s",
             cert_file, key_file, ciphers,
-            options, dh_file, ca_file,
+            options, command, dh_file, ca_file,
             hex_encode(dh_hex, dh, dh_size));
 
     enif_rwlock_rlock(certs_map_lock);
